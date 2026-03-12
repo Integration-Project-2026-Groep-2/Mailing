@@ -22,8 +22,8 @@ sgMail.setClient(sgClient);
 sgMail.setApiKey(apiKey);
 
 const msg = {
-    to: "lucasleonte2005@gmail.com", // Change to your recipient
-    from: "lucasleonte2005@gmail.com", // Change to your verified sender
+    to: "desiderius.events@gmail.com", // Change to your recipient
+    from: "desiderius.events@gmail.com", // Change to your verified sender
     subject: "Sending with SendGrid is Fun",
     text: "and easy to do anywhere, even with Node.js",
     html: "<strong>and easy to do anywhere, even with Node.js</strong>",
