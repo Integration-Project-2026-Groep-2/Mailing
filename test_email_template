@@ -1,0 +1,51 @@
+// using Twilio SendGrid's v3 Node.js Library
+// https://github.com/sendgrid/sendgrid-nodejs
+
+const path = require("path");
+require("dotenv").config({
+    path: path.resolve(__dirname, ".env"),
+    override: true,
+});
+
+const sgMail = require("@sendgrid/mail");
+const sgClient = require("@sendgrid/client");
+
+const apiKey = (process.env.SENDGRID_API_KEY || "").trim();
+
+if (!apiKey.startsWith("SG.")) {
+    throw new Error(
+        "SENDGRID_API_KEY is missing or malformed. Check that .env is saved as UTF-8 and contains a valid SendGrid API key.",
+    );
+}
+
+sgMail.setClient(sgClient);
+sgMail.setApiKey(apiKey);
+
+const msg = {
+    to: "desiderius.events@gmail.com",
+    from: "desiderius.events@gmail.com",
+    templateId: "d-65ddc8965cbc4bfa81c3cc2728abd39f",
+    dynamicTemplateData: {
+        first_name: "TestGebruiker",
+        subject_line: "Je bent ingeschreven!",
+        timestamp: "12 Maart 2026, 20:25",
+        total_amount: "€12.50",
+        invoice_url: "https://fossbilling.example.com/inv123",
+        qr_code_url:
+            "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TEST-TICKET",
+    },
+};
+
+sgMail
+    .send(msg)
+    .then(() => {
+        console.log("Email sent");
+    })
+    .catch((error) => {
+        if (error.response?.body) {
+            console.error(JSON.stringify(error.response.body, null, 2));
+            return;
+        }
+
+        console.error(error);
+    });
