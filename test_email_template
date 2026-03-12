@@ -21,6 +21,7 @@ if (!apiKey.startsWith("SG.")) {
 sgMail.setClient(sgClient);
 sgMail.setApiKey(apiKey);
 
+// TODO: Determine template ID using switch statement
 const msg = {
     to: "desiderius.events@gmail.com",
     from: "desiderius.events@gmail.com",
