@@ -1,6 +1,16 @@
 {
-  "dependencies": {
-    "@sendgrid/mail": "^8.1.6",
-    "dotenv": "^17.3.1"
-  }
+    "name": "shiftfestival-mailing-service",
+    "version": "1.0.0",
+    "description": "Shiftfestival centralized mailing service",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "node --watch src/server.js"
+    },
+    "dependencies": {
+        "@sendgrid/mail": "^8.1.6",
+        "dotenv": "^17.3.1",
+        "express": "^4.21.2",
+        "mysql2": "^3.11.4"
+    }
 }

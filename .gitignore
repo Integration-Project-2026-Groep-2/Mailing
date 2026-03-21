@@ -1,6 +1,3 @@
-# Docker
-compose.yml
-
 # Logs
 npm-debug.log*
 yarn-debug.log*
