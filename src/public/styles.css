@@ -1,0 +1,165 @@
+:root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --text: #1e2430;
+    --muted: #6d7483;
+    --line: #dbe0ea;
+    --primary: #1e5ae8;
+    --primary-hover: #1746b6;
+    --secondary: #eef2fb;
+    --danger: #d14545;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(180deg, #f6f7fb 0%, #eff3fb 100%);
+    color: var(--text);
+}
+
+.page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+}
+
+.page-narrow {
+    max-width: 760px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+h1 {
+    margin: 0;
+}
+
+.subtitle {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th,
+td {
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    padding: 10px 8px;
+}
+
+th {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+.button {
+    display: inline-block;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.button-primary {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.button-primary:hover {
+    background: var(--primary-hover);
+}
+
+.button-secondary {
+    background: var(--secondary);
+    border-color: #d9e3f7;
+}
+
+.button-danger {
+    background: #fff4f4;
+    border-color: #ffd9d9;
+    color: var(--danger);
+}
+
+.form {
+    display: grid;
+    gap: 12px;
+}
+
+.form label {
+    display: grid;
+    gap: 6px;
+}
+
+input,
+select {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+}
+
+.empty-state {
+    color: var(--muted);
+    padding: 16px 8px;
+}
+
+.error-state {
+    color: var(--danger);
+}
+
+@media (max-width: 800px) {
+    .page-header {
+        flex-direction: column;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

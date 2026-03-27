@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit User - Mailing Service</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page page-narrow">
+      <header class="page-header">
+        <div>
+          <h1>Edit User</h1>
+          <p class="subtitle">
+            Fields are prefilled, update action is not implemented yet.
+          </p>
+        </div>
+        <a class="button button-secondary" href="/">Back to users</a>
+      </header>
+
+      <section class="card">
+        <p id="edit-status">Loading user details...</p>
+
+        <form id="edit-form" class="form" novalidate>
+          <label>
+            <span>Email</span>
+            <input id="email" name="email" type="email" readonly />
+          </label>
+          <label>
+            <span>First Name</span>
+            <input id="firstName" name="firstName" type="text" readonly />
+          </label>
+          <label>
+            <span>Last Name</span>
+            <input id="lastName" name="lastName" type="text" readonly />
+          </label>
+          <label>
+            <span>GDPR Consent</span>
+            <input id="gdprConsent" name="gdprConsent" type="text" readonly />
+          </label>
+          <label>
+            <span>Company ID</span>
+            <input id="companyId" name="companyId" type="text" readonly />
+          </label>
+          <button class="button button-primary" type="submit">
+            Save (coming later)
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/edit.js"></script>
+  </body>
+</html>
