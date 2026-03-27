@@ -1,6 +1,13 @@
 const amqp = require("amqplib");
 const { XMLParser } = require("fast-xml-parser");
+const { execFileSync } = require("child_process");
+const path = require("path");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+
+const USER_CONTRACT_XSD_PATH = path.resolve(
+    __dirname,
+    "../../contracts/user_data_contract.xsd",
+);
 
 const UUID_V4_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -80,6 +87,31 @@ function createValidationError(message) {
     const error = new Error(message);
     error.isValidationError = true;
     return error;
+}
+
+function validateXmlAgainstUserContract(xmlContent) {
+    try {
+        execFileSync(
+            "xmllint",
+            ["--noout", "--schema", USER_CONTRACT_XSD_PATH, "-"],
+            {
+                input: xmlContent,
+                encoding: "utf8",
+                stdio: ["pipe", "pipe", "pipe"],
+            },
+        );
+    } catch (error) {
+        const stderr = String(error?.stderr || "").trim();
+        const details = stderr || error.message;
+
+        if (error?.code === "ENOENT") {
+            throw new Error(
+                "xmllint is not available. Install xmllint in the runtime image to enable XSD validation.",
+            );
+        }
+
+        throw createValidationError(`XSD validation failed: ${details}`);
+    }
 }
 
 function createCrmUserConfirmedConsumer({
@@ -271,6 +303,7 @@ function createCrmUserConfirmedConsumer({
     async function processMessage(msg) {
         const xmlContent = msg.content.toString("utf8");
 
+        validateXmlAgainstUserContract(xmlContent);
         const rawUser = extractUserFromXml(xmlContent);
         validateUserContract(rawUser);
         const persistedUser = await userRepository.upsertUser(rawUser);
