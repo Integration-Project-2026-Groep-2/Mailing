@@ -1,6 +1,7 @@
 const express = require("express");
 const mysql = require("mysql2/promise");
 const path = require("path");
+const { createHeartbeatPublisher } = require("./publishers/heartbeatPublisher");
 
 require("dotenv").config({
     path: path.resolve(process.cwd(), ".env"),
@@ -18,6 +19,9 @@ const dbConfig = {
 };
 
 let pool;
+let server;
+
+const heartbeatPublisher = createHeartbeatPublisher();
 
 async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -79,11 +83,50 @@ app.get("/users", async (_req, res) => {
 
 async function start() {
     await connectWithRetry();
+    await heartbeatPublisher.start();
 
-    app.listen(port, () => {
+    server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
     });
 }
+
+async function shutdown(signal) {
+    console.log(`Received ${signal}. Shutting down...`);
+
+    if (server) {
+        await new Promise((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+
+    await heartbeatPublisher.stop();
+
+    if (pool) {
+        await pool.end();
+    }
+
+    process.exit(0);
+}
+
+process.on("SIGINT", () => {
+    shutdown("SIGINT").catch((error) => {
+        console.error("Failed graceful shutdown:", error);
+        process.exit(1);
+    });
+});
+
+process.on("SIGTERM", () => {
+    shutdown("SIGTERM").catch((error) => {
+        console.error("Failed graceful shutdown:", error);
+        process.exit(1);
+    });
+});
 
 start().catch((error) => {
     console.error("Failed to start service:", error);

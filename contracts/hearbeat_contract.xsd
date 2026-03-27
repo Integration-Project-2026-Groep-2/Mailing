@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <xs:element name="Heartbeat" type="HeartbeatType"/>
+  <xs:complexType name="HeartbeatType">
+    <xs:sequence>
+      <xs:element name="serviceId"       type="xs:string"/>
+      <xs:element name="timestamp"       type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MillisecondDurationType">
+    <xs:simpleContent>
+      <xs:extension base="xs:positiveInteger">
+        <xs:attribute name="unit" type="xs:string" fixed="ms"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+</xs:schema>
