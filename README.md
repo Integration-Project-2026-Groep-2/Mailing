@@ -52,6 +52,18 @@ Optional heartbeat variables:
 - `RABBITMQ_PORT` (default: `5672`)
 - `RABBITMQ_VHOST` (default: `/`)
 
+Optional CRM user sync variables:
+
+- `CRM_USER_SYNC_ENABLED` (default: `true`)
+- `CRM_USER_EXCHANGE` (default: `contact.topic`)
+- `CRM_USER_EXCHANGE_TYPE` (default: `topic`)
+- `CRM_USER_QUEUE` (default: `mailing.user.confirmed`)
+- `CRM_USER_ROUTING_KEY` (default: `crm.user.confirmed`)
+- `CRM_USER_PREFETCH` (default: `10`)
+- `SENDGRID_ENABLED` (default: `true`)
+- `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
+- `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
+
 ## Run with Docker Compose
 
 ```bash
@@ -95,6 +107,18 @@ On startup, the service opens an AMQP channel and publishes heartbeat XML messag
 
 The service is publisher-only for heartbeats. It does not consume heartbeat messages; Controlroom is the consumer.
 The mailing service does not declare or manage queues; it only publishes heartbeat events to the topic exchange with routing key `heartbeat.mailing`.
+
+## CRM user sync consumption
+
+The service consumes `crm.user.confirmed` events from RabbitMQ and validates `UserConfirmed` XML payloads against the user contract rules defined in `contracts/user_data_contract.xsd`.
+
+For every valid message:
+
+- Upserts `users` with only `id`, `email`, `firstName`, `lastName`, `gdprConsent`, and `companyId`
+- Sends a SendGrid dynamic template email using `SENDGRID_USER_CONFIRMED_TEMPLATE_ID`
+- Writes status entries into `mail_logs` with `SENT` or `FAILED`
+
+Payloads that fail XML/XSD validation are rejected without requeue. Transient infrastructure failures are nacked with requeue.
 
 When Compose is running with default values:
 

@@ -178,4 +178,5 @@ function createHeartbeatPublisher() {
 
 module.exports = {
     createHeartbeatPublisher,
+    buildRabbitUrlFromEnv,
 };
