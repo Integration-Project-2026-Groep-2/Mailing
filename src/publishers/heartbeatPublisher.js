@@ -1,4 +1,12 @@
 const amqp = require("amqplib");
+const path = require("path");
+const { spawn } = require("child_process");
+const { XMLParser, XMLValidator } = require("fast-xml-parser");
+
+const heartbeatContractPath = path.resolve(
+    __dirname,
+    "../../contracts/hearbeat_contract.xsd",
+);
 
 function escapeXml(value) {
     return String(value)
@@ -42,6 +50,92 @@ function buildRabbitUrlFromEnv() {
     return `amqp://${user}:${password}@${host}:${port}/${normalizedVHost}`;
 }
 
+function validateIsoDateTime(value) {
+    if (typeof value !== "string") {
+        return false;
+    }
+
+    const xsDateTimeRegex =
+        /^-?\d{4,}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+    if (!xsDateTimeRegex.test(value)) {
+        return false;
+    }
+
+    return !Number.isNaN(Date.parse(value));
+}
+
+function validateHeartbeatWithParser(xml) {
+    const xmlValidationResult = XMLValidator.validate(xml);
+    if (xmlValidationResult !== true) {
+        throw new Error(
+            `Heartbeat XML is malformed: ${xmlValidationResult.err.msg}`,
+        );
+    }
+
+    const parser = new XMLParser({
+        ignoreAttributes: false,
+        trimValues: true,
+        parseTagValue: false,
+    });
+    const payload = parser.parse(xml);
+
+    if (!payload || typeof payload !== "object" || !payload.Heartbeat) {
+        throw new Error("Heartbeat XML must contain a root Heartbeat element");
+    }
+
+    const heartbeat = payload.Heartbeat;
+    if (typeof heartbeat.serviceId !== "string") {
+        throw new Error("Heartbeat.serviceId must be an xs:string value");
+    }
+
+    if (!validateIsoDateTime(heartbeat.timestamp)) {
+        throw new Error(
+            "Heartbeat.timestamp must be a valid xs:dateTime value",
+        );
+    }
+}
+
+function validateHeartbeatWithXmllint(xml) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(
+            "xmllint",
+            ["--noout", "--schema", heartbeatContractPath, "-"],
+            { stdio: ["pipe", "pipe", "pipe"] },
+        );
+
+        let stderr = "";
+
+        child.stderr.on("data", (data) => {
+            stderr += data.toString();
+        });
+
+        child.on("error", (error) => {
+            if (error.code === "ENOENT") {
+                resolve({ validated: false, reason: "xmllint-not-found" });
+                return;
+            }
+
+            reject(error);
+        });
+
+        child.on("close", (code) => {
+            if (code === 0) {
+                resolve({ validated: true });
+                return;
+            }
+
+            reject(
+                new Error(
+                    `Heartbeat XML failed XSD validation: ${stderr.trim() || "unknown xmllint error"}`,
+                ),
+            );
+        });
+
+        child.stdin.write(xml);
+        child.stdin.end();
+    });
+}
+
 function createHeartbeatPublisher() {
     const enabled = parseBoolean(process.env.HEARTBEAT_ENABLED, true);
     const serviceId = process.env.HEARTBEAT_SERVICE_ID || "mailing";
@@ -56,6 +150,19 @@ function createHeartbeatPublisher() {
     let channel;
     let timer;
     let isPublishing = false;
+    let warnedAboutXmllint = false;
+
+    async function validateHeartbeatXml(xml) {
+        const xmllintResult = await validateHeartbeatWithXmllint(xml);
+        if (!xmllintResult.validated && !warnedAboutXmllint) {
+            warnedAboutXmllint = true;
+            console.warn(
+                "xmllint not found; using parser-based heartbeat validation fallback",
+            );
+        }
+
+        validateHeartbeatWithParser(xml);
+    }
 
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
         for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -112,6 +219,8 @@ function createHeartbeatPublisher() {
                 serviceId,
                 timestamp: new Date().toISOString(),
             });
+
+            await validateHeartbeatXml(xml);
 
             const published = channel.publish(
                 exchange,
