@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create User - Mailing Service</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page page-narrow">
+      <header class="page-header">
+        <div>
+          <h1>Create User</h1>
+          <p class="subtitle">Create action is not implemented yet.</p>
+        </div>
+        <a class="button button-secondary" href="/">Back to users</a>
+      </header>
+
+      <section class="card">
+        <form id="create-form" class="form" novalidate>
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" placeholder="name@example.com" />
+          </label>
+          <label>
+            <span>First Name</span>
+            <input name="firstName" type="text" placeholder="First name" />
+          </label>
+          <label>
+            <span>Last Name</span>
+            <input name="lastName" type="text" placeholder="Last name" />
+          </label>
+          <label>
+            <span>GDPR Consent</span>
+            <select name="gdprConsent">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <label>
+            <span>Company ID</span>
+            <input name="companyId" type="text" placeholder="Optional UUID" />
+          </label>
+          <button class="button button-primary" type="submit">
+            Create (coming later)
+          </button>
+        </form>
+        <p id="create-status"></p>
+      </section>
+    </main>
+
+    <script src="/new.js"></script>
+  </body>
+</html>

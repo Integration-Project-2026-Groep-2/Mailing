@@ -15,6 +15,7 @@ require("dotenv").config({
 
 const app = express();
 const port = Number(process.env.APP_PORT || 3000);
+const publicDir = path.resolve(__dirname, "public");
 
 const dbConfig = {
     host: process.env.DB_HOST || "db",
@@ -29,6 +30,8 @@ let server;
 let crmUserConfirmedConsumer;
 
 const heartbeatPublisher = createHeartbeatPublisher();
+
+app.use(express.static(publicDir));
 
 async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -86,6 +89,18 @@ app.get("/users", async (_req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+app.get("/", (_req, res) => {
+    res.sendFile(path.join(publicDir, "index.html"));
+});
+
+app.get("/users/new", (_req, res) => {
+    res.sendFile(path.join(publicDir, "new.html"));
+});
+
+app.get("/users/:id/edit", (_req, res) => {
+    res.sendFile(path.join(publicDir, "edit.html"));
 });
 
 async function start() {
