@@ -2,6 +2,12 @@ const express = require("express");
 const mysql = require("mysql2/promise");
 const path = require("path");
 const { createHeartbeatPublisher } = require("./publishers/heartbeatPublisher");
+const {
+    createCrmUserConfirmedConsumer,
+} = require("./consumers/crmUserConfirmedConsumer");
+const { createUserRepository } = require("./repositories/userRepository");
+const { createMailLogRepository } = require("./repositories/mailLogRepository");
+const { createSendgridService } = require("./services/sendgridService");
 
 require("dotenv").config({
     path: path.resolve(process.cwd(), ".env"),
@@ -20,6 +26,7 @@ const dbConfig = {
 
 let pool;
 let server;
+let crmUserConfirmedConsumer;
 
 const heartbeatPublisher = createHeartbeatPublisher();
 
@@ -83,7 +90,18 @@ app.get("/users", async (_req, res) => {
 
 async function start() {
     await connectWithRetry();
+
+    const userRepository = createUserRepository(pool);
+    const mailLogRepository = createMailLogRepository(pool);
+    const sendgridService = createSendgridService();
+    crmUserConfirmedConsumer = createCrmUserConfirmedConsumer({
+        userRepository,
+        mailLogRepository,
+        sendgridService,
+    });
+
     await heartbeatPublisher.start();
+    await crmUserConfirmedConsumer.start();
 
     server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
@@ -106,6 +124,10 @@ async function shutdown(signal) {
     }
 
     await heartbeatPublisher.stop();
+
+    if (crmUserConfirmedConsumer) {
+        await crmUserConfirmedConsumer.stop();
+    }
 
     if (pool) {
         await pool.end();
