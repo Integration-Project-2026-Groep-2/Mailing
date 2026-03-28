@@ -12,6 +12,9 @@ const {
 const {
     createCrmUserDeactivatedConsumer,
 } = require("./consumers/crmUserDeactivatedConsumer");
+const {
+    createCrmUserUpdatedConsumer,
+} = require("./consumers/crmUserUpdatedConsumer");
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
@@ -39,6 +42,7 @@ let pool;
 let server;
 let crmUserConfirmedConsumer;
 let crmUserDeactivatedConsumer;
+let crmUserUpdatedConsumer;
 let userRepository;
 
 const heartbeatPublisher = createHeartbeatPublisher();
@@ -405,11 +409,15 @@ async function start() {
     crmUserDeactivatedConsumer = createCrmUserDeactivatedConsumer({
         userRepository,
     });
+    crmUserUpdatedConsumer = createCrmUserUpdatedConsumer({
+        userRepository,
+    });
 
     await heartbeatPublisher.start();
     await mailingUserPublisher.start();
     await crmUserConfirmedConsumer.start();
     await crmUserDeactivatedConsumer.start();
+    await crmUserUpdatedConsumer.start();
 
     server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
@@ -440,6 +448,10 @@ async function shutdown(signal) {
 
     if (crmUserDeactivatedConsumer) {
         await crmUserDeactivatedConsumer.stop();
+    }
+
+    if (crmUserUpdatedConsumer) {
+        await crmUserUpdatedConsumer.stop();
     }
 
     if (pool) {
