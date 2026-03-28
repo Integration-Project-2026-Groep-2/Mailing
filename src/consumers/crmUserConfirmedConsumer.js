@@ -273,6 +273,22 @@ function createCrmUserConfirmedConsumer({
 
         const rawUser = extractUserFromXml(xmlContent);
         validateUserContract(rawUser);
+
+        const existingByEmail = await userRepository.findUserByEmail(
+            rawUser.email,
+        );
+        if (existingByEmail && existingByEmail.id !== rawUser.id) {
+            const existingByCrmId = await userRepository.findUserById(
+                rawUser.id,
+            );
+            if (!existingByCrmId) {
+                await userRepository.replaceUserId(
+                    existingByEmail.id,
+                    rawUser.id,
+                );
+            }
+        }
+
         const persistedUser = await userRepository.upsertUser(rawUser);
 
         try {

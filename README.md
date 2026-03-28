@@ -64,6 +64,14 @@ Optional CRM user sync variables:
 - `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
 - `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
 
+Optional outbound Mailing user publish variables:
+
+- `MAILING_USER_PUBLISH_ENABLED` (default: `true`)
+- `MAILING_USER_EXCHANGE` (default: `user.topic`)
+- `MAILING_USER_EXCHANGE_TYPE` (default: `topic`)
+- `MAILING_USER_CREATED_ROUTING_KEY` (default: `mailing.user.created`)
+- `MAILING_USER_UPDATED_ROUTING_KEY` (default: `mailing.user.updated`)
+
 ## Run with Docker Compose
 
 ```bash
@@ -92,6 +100,8 @@ docker compose -f compose.yml down -v
 
 - `GET /health`: service + database health check
 - `GET /users`: list up to 100 users
+- `POST /users`: persist user locally, then publish `mailing.user.created`
+- `PUT /users/:id`: persist update locally, then publish `mailing.user.updated` (email immutable)
 
 ## Heartbeat publishing
 
@@ -119,6 +129,17 @@ For every valid message:
 - Writes status entries into `mail_logs` with `SENT` or `FAILED`
 
 Payloads that fail XML/XSD validation are rejected without requeue. Transient infrastructure failures are nacked with requeue.
+
+## Outbound create/update sync
+
+Create and update execute in this order:
+
+1. Persist in MariaDB
+2. Publish XML to RabbitMQ
+
+For create, the service first stores a locally generated UUID. If CRM later confirms the same email with a different official UUID on `crm.user.confirmed`, the consumer reconciles the local user id to the CRM id.
+
+If persistence succeeds but publish fails, the API returns `502` with `persisted=true`.
 
 When Compose is running with default values:
 

@@ -21,6 +21,16 @@ function normalizeBoolean(value, fieldName) {
         return value;
     }
 
+    if (typeof value === "number") {
+        if (value === 1) {
+            return true;
+        }
+
+        if (value === 0) {
+            return false;
+        }
+    }
+
     if (typeof value === "string") {
         const normalized = value.trim().toLowerCase();
         if (normalized === "true" || normalized === "1") {
@@ -47,6 +57,83 @@ function mapPersistedUser(rawUser) {
 }
 
 function createUserRepository(pool) {
+    async function findUserById(id) {
+        const normalizedId = normalizeRequiredString(id, "id");
+        const [rows] = await pool.query(
+            `
+            SELECT id, email, firstName, lastName, gdprConsent, companyId
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [normalizedId],
+        );
+
+        if (!rows[0]) {
+            return null;
+        }
+
+        return mapPersistedUser(rows[0]);
+    }
+
+    async function findUserByEmail(email) {
+        const normalizedEmail = normalizeRequiredString(email, "email");
+        const [rows] = await pool.query(
+            `
+            SELECT id, email, firstName, lastName, gdprConsent, companyId
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+            `,
+            [normalizedEmail],
+        );
+
+        if (!rows[0]) {
+            return null;
+        }
+
+        return mapPersistedUser(rows[0]);
+    }
+
+    async function replaceUserId(oldId, newId) {
+        const normalizedOldId = normalizeRequiredString(oldId, "oldId");
+        const normalizedNewId = normalizeRequiredString(newId, "newId");
+
+        if (normalizedOldId === normalizedNewId) {
+            return;
+        }
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            await connection.query(
+                `
+                UPDATE mail_logs
+                SET userId = ?
+                WHERE userId = ?
+                `,
+                [normalizedNewId, normalizedOldId],
+            );
+
+            await connection.query(
+                `
+                UPDATE users
+                SET id = ?, updatedAt = CURRENT_TIMESTAMP
+                WHERE id = ?
+                `,
+                [normalizedNewId, normalizedOldId],
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     async function upsertUser(rawUser) {
         const user = mapPersistedUser(rawUser);
 
@@ -76,6 +163,9 @@ function createUserRepository(pool) {
     }
 
     return {
+        findUserById,
+        findUserByEmail,
+        replaceUserId,
         upsertUser,
     };
 }

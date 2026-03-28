@@ -12,7 +12,8 @@
         <div>
           <h1>Edit User</h1>
           <p class="subtitle">
-            Fields are prefilled, update action is not implemented yet.
+            Email is immutable. Other fields are persisted then published to
+            CRM.
           </p>
         </div>
         <a class="button button-secondary" href="/">Back to users</a>
@@ -28,23 +29,24 @@
           </label>
           <label>
             <span>First Name</span>
-            <input id="firstName" name="firstName" type="text" readonly />
+            <input id="firstName" name="firstName" type="text" />
           </label>
           <label>
             <span>Last Name</span>
-            <input id="lastName" name="lastName" type="text" readonly />
+            <input id="lastName" name="lastName" type="text" />
           </label>
           <label>
             <span>GDPR Consent</span>
-            <input id="gdprConsent" name="gdprConsent" type="text" readonly />
+            <select id="gdprConsent" name="gdprConsent">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
           </label>
           <label>
             <span>Company ID</span>
-            <input id="companyId" name="companyId" type="text" readonly />
+            <input id="companyId" name="companyId" type="text" />
           </label>
-          <button class="button button-primary" type="submit">
-            Save (coming later)
-          </button>
+          <button class="button button-primary" type="submit">Save</button>
         </form>
       </section>
     </main>

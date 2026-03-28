@@ -1,7 +1,11 @@
 const express = require("express");
 const mysql = require("mysql2/promise");
 const path = require("path");
+const { randomUUID } = require("crypto");
 const { createHeartbeatPublisher } = require("./publishers/heartbeatPublisher");
+const {
+    createMailingUserPublisher,
+} = require("./publishers/mailingUserPublisher");
 const {
     createCrmUserConfirmedConsumer,
 } = require("./consumers/crmUserConfirmedConsumer");
@@ -16,6 +20,9 @@ require("dotenv").config({
 const app = express();
 const port = Number(process.env.APP_PORT || 3000);
 const publicDir = path.resolve(__dirname, "public");
+const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const UUID_V4_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const dbConfig = {
     host: process.env.DB_HOST || "db",
@@ -28,10 +35,166 @@ const dbConfig = {
 let pool;
 let server;
 let crmUserConfirmedConsumer;
+let userRepository;
 
 const heartbeatPublisher = createHeartbeatPublisher();
+const mailingUserPublisher = createMailingUserPublisher();
 
 app.use(express.static(publicDir));
+app.use(express.json());
+
+function createValidationError(message) {
+    const error = new Error(message);
+    error.isValidationError = true;
+    return error;
+}
+
+function normalizeOptionalString(value) {
+    if (value === undefined || value === null) {
+        return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized === "" ? null : normalized;
+}
+
+function normalizeRequiredString(value, fieldName) {
+    const normalized = normalizeOptionalString(value);
+    if (!normalized) {
+        throw createValidationError(`Missing required field: ${fieldName}`);
+    }
+
+    return normalized;
+}
+
+function normalizeBoolean(value, fieldName) {
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (typeof value === "number") {
+        if (value === 1) {
+            return true;
+        }
+
+        if (value === 0) {
+            return false;
+        }
+    }
+
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true" || normalized === "1") {
+            return true;
+        }
+
+        if (normalized === "false" || normalized === "0") {
+            return false;
+        }
+    }
+
+    throw createValidationError(`Invalid boolean field: ${fieldName}`);
+}
+
+function normalizeEmail(value, fieldName = "email") {
+    const normalized = normalizeRequiredString(value, fieldName).toLowerCase();
+    if (!EMAIL_REGEX.test(normalized) || normalized.length > 254) {
+        throw createValidationError(`Invalid email field: ${fieldName}`);
+    }
+
+    return normalized;
+}
+
+function normalizeOptionalUuid(value, fieldName) {
+    const normalized = normalizeOptionalString(value);
+    if (!normalized) {
+        return null;
+    }
+
+    if (!UUID_V4_REGEX.test(normalized)) {
+        throw createValidationError(`Invalid UUID field: ${fieldName}`);
+    }
+
+    return normalized;
+}
+
+function normalizeRequiredUuid(value, fieldName) {
+    const normalized = normalizeRequiredString(value, fieldName);
+    if (!UUID_V4_REGEX.test(normalized)) {
+        throw createValidationError(`Invalid UUID field: ${fieldName}`);
+    }
+
+    return normalized;
+}
+
+function parseCreateUserPayload(body) {
+    const payload = body || {};
+    return {
+        id: randomUUID(),
+        email: normalizeEmail(payload.email),
+        firstName: normalizeOptionalString(payload.firstName),
+        lastName: normalizeOptionalString(payload.lastName),
+        gdprConsent: normalizeBoolean(payload.gdprConsent, "gdprConsent"),
+        companyId: normalizeOptionalUuid(payload.companyId, "companyId"),
+    };
+}
+
+function parseUpdateUserPayload(existingUser, body) {
+    const payload = body || {};
+    const incomingEmail = normalizeOptionalString(payload.email);
+
+    if (
+        incomingEmail &&
+        incomingEmail.toLowerCase() !== existingUser.email.toLowerCase()
+    ) {
+        throw createValidationError("Email is immutable and cannot be changed");
+    }
+
+    const hasGdprConsent = payload.gdprConsent !== undefined;
+
+    return {
+        id: existingUser.id,
+        email: existingUser.email,
+        firstName:
+            payload.firstName === undefined
+                ? existingUser.firstName
+                : normalizeOptionalString(payload.firstName),
+        lastName:
+            payload.lastName === undefined
+                ? existingUser.lastName
+                : normalizeOptionalString(payload.lastName),
+        gdprConsent: hasGdprConsent
+            ? normalizeBoolean(payload.gdprConsent, "gdprConsent")
+            : existingUser.gdprConsent,
+        companyId:
+            payload.companyId === undefined
+                ? existingUser.companyId
+                : normalizeOptionalUuid(payload.companyId, "companyId"),
+    };
+}
+
+function handleApiError(res, error, options = {}) {
+    const {
+        publishFailedStatus = 502,
+        publishFailedMessage = "User was persisted but message publication failed",
+    } = options;
+
+    if (error?.isValidationError) {
+        res.status(422).json({ error: error.message });
+        return;
+    }
+
+    if (error?.code === "PUBLISH_FAILED") {
+        res.status(publishFailedStatus).json({
+            error: publishFailedMessage,
+            details: error.message,
+            persisted: true,
+        });
+        return;
+    }
+
+    res.status(500).json({ error: error.message });
+}
 
 async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -91,6 +254,80 @@ app.get("/users", async (_req, res) => {
     }
 });
 
+app.post("/users", async (req, res) => {
+    if (!userRepository) {
+        res.status(503).json({ error: "User repository not initialized" });
+        return;
+    }
+
+    try {
+        const user = parseCreateUserPayload(req.body);
+        const existing = await userRepository.findUserByEmail(user.email);
+        if (existing) {
+            res.status(409).json({
+                error: "User with this email already exists",
+                user: existing,
+            });
+            return;
+        }
+
+        const persistedUser = await userRepository.upsertUser(user);
+
+        try {
+            await mailingUserPublisher.publishUserCreated(persistedUser);
+        } catch (error) {
+            error.code = "PUBLISH_FAILED";
+            throw error;
+        }
+
+        res.status(201).json({
+            status: "persisted_and_published",
+            user: persistedUser,
+            syncStatus: "pending_crm_reconciliation",
+        });
+    } catch (error) {
+        handleApiError(res, error);
+    }
+});
+
+app.put("/users/:id", async (req, res) => {
+    if (!userRepository) {
+        res.status(503).json({ error: "User repository not initialized" });
+        return;
+    }
+
+    try {
+        const userId = normalizeRequiredUuid(req.params.id, "id");
+        const existingUser = await userRepository.findUserById(userId);
+        if (!existingUser) {
+            res.status(404).json({ error: "User not found" });
+            return;
+        }
+
+        const userToPersist = parseUpdateUserPayload(existingUser, req.body);
+        const persistedUser = await userRepository.upsertUser(userToPersist);
+
+        try {
+            await mailingUserPublisher.publishUserUpdated(persistedUser);
+        } catch (error) {
+            error.code = "PUBLISH_FAILED";
+            throw error;
+        }
+
+        res.status(200).json({
+            status: "persisted_and_published",
+            user: persistedUser,
+        });
+    } catch (error) {
+        if (error?.isValidationError && error.message.includes("immutable")) {
+            res.status(409).json({ error: error.message });
+            return;
+        }
+
+        handleApiError(res, error);
+    }
+});
+
 app.get("/", (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
 });
@@ -106,7 +343,7 @@ app.get("/users/:id/edit", (_req, res) => {
 async function start() {
     await connectWithRetry();
 
-    const userRepository = createUserRepository(pool);
+    userRepository = createUserRepository(pool);
     const mailLogRepository = createMailLogRepository(pool);
     const sendgridService = createSendgridService();
     crmUserConfirmedConsumer = createCrmUserConfirmedConsumer({
@@ -116,6 +353,7 @@ async function start() {
     });
 
     await heartbeatPublisher.start();
+    await mailingUserPublisher.start();
     await crmUserConfirmedConsumer.start();
 
     server = app.listen(port, () => {
@@ -139,6 +377,7 @@ async function shutdown(signal) {
     }
 
     await heartbeatPublisher.stop();
+    await mailingUserPublisher.stop();
 
     if (crmUserConfirmedConsumer) {
         await crmUserConfirmedConsumer.stop();
