@@ -9,6 +9,9 @@ const {
 const {
     createCrmUserConfirmedConsumer,
 } = require("./consumers/crmUserConfirmedConsumer");
+const {
+    createCrmUserDeactivatedConsumer,
+} = require("./consumers/crmUserDeactivatedConsumer");
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
@@ -35,6 +38,7 @@ const dbConfig = {
 let pool;
 let server;
 let crmUserConfirmedConsumer;
+let crmUserDeactivatedConsumer;
 let userRepository;
 
 const heartbeatPublisher = createHeartbeatPublisher();
@@ -351,10 +355,14 @@ async function start() {
         mailLogRepository,
         sendgridService,
     });
+    crmUserDeactivatedConsumer = createCrmUserDeactivatedConsumer({
+        userRepository,
+    });
 
     await heartbeatPublisher.start();
     await mailingUserPublisher.start();
     await crmUserConfirmedConsumer.start();
+    await crmUserDeactivatedConsumer.start();
 
     server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
@@ -381,6 +389,10 @@ async function shutdown(signal) {
 
     if (crmUserConfirmedConsumer) {
         await crmUserConfirmedConsumer.stop();
+    }
+
+    if (crmUserDeactivatedConsumer) {
+        await crmUserDeactivatedConsumer.stop();
     }
 
     if (pool) {

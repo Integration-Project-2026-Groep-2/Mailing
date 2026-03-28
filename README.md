@@ -64,6 +64,15 @@ Optional CRM user sync variables:
 - `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
 - `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
 
+Optional CRM user deactivated sync variables:
+
+- `CRM_USER_DEACTIVATED_SYNC_ENABLED` (default: `true`)
+- `CRM_USER_DEACTIVATED_EXCHANGE` (default: `contact.topic`)
+- `CRM_USER_DEACTIVATED_EXCHANGE_TYPE` (default: `topic`)
+- `CRM_USER_DEACTIVATED_QUEUE` (default: `mailing.user.deactivated`)
+- `CRM_USER_DEACTIVATED_ROUTING_KEY` (default: `crm.user.deactivated`)
+- `CRM_USER_DEACTIVATED_PREFETCH` (default: `10`)
+
 Optional outbound Mailing user publish variables:
 
 - `MAILING_USER_PUBLISH_ENABLED` (default: `true`)
@@ -129,6 +138,14 @@ For every valid message:
 - Writes status entries into `mail_logs` with `SENT` or `FAILED`
 
 Payloads that fail XML/XSD validation are rejected without requeue. Transient infrastructure failures are nacked with requeue.
+
+## CRM user deactivated consumption
+
+The service consumes `crm.user.deactivated` from `contact.topic` and validates payloads against `contracts/user_data_contract.xsd` (Contract 22: `id`, `email`, `deactivatedAt`).
+
+For valid deactivation messages, the service marks the user as deactivated for mailing by setting `gdprConsent = false`. This ensures future mailing is stopped for GDPR deactivation/cancellation requests.
+
+Sample payload for this flow is available at `tests/crm_user_deactivated_sample.xml`.
 
 ## Outbound create/update sync
 

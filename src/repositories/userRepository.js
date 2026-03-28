@@ -162,7 +162,37 @@ function createUserRepository(pool) {
         return user;
     }
 
+    async function deactivateUserByIdentity(rawUser) {
+        const normalizedId = normalizeRequiredString(rawUser.id, "id");
+        const normalizedEmail = normalizeRequiredString(rawUser.email, "email");
+
+        const [result] = await pool.query(
+            `
+            UPDATE users
+            SET gdprConsent = FALSE, updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ? AND email = ?
+            `,
+            [normalizedId, normalizedEmail],
+        );
+
+        if (result.affectedRows === 0) {
+            const [fallbackResult] = await pool.query(
+                `
+                UPDATE users
+                SET gdprConsent = FALSE, updatedAt = CURRENT_TIMESTAMP
+                WHERE email = ?
+                `,
+                [normalizedEmail],
+            );
+
+            return fallbackResult.affectedRows;
+        }
+
+        return result.affectedRows;
+    }
+
     return {
+        deactivateUserByIdentity,
         findUserById,
         findUserByEmail,
         replaceUserId,
