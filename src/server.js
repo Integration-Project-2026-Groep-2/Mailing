@@ -332,6 +332,53 @@ app.put("/users/:id", async (req, res) => {
     }
 });
 
+app.post("/users/:id/deactivate", async (req, res) => {
+    if (!userRepository) {
+        res.status(503).json({ error: "User repository not initialized" });
+        return;
+    }
+
+    try {
+        const userId = normalizeRequiredUuid(req.params.id, "id");
+        const existingUser = await userRepository.findUserById(userId);
+        if (!existingUser) {
+            res.status(404).json({ error: "User not found" });
+            return;
+        }
+
+        await userRepository.deactivateUserByIdentity({
+            id: existingUser.id,
+            email: existingUser.email,
+        });
+
+        const deactivatedAt = new Date().toISOString();
+        try {
+            await mailingUserPublisher.publishUserDeactivated({
+                id: existingUser.id,
+                email: existingUser.email,
+                deactivatedAt,
+            });
+        } catch (error) {
+            error.code = "PUBLISH_FAILED";
+            throw error;
+        }
+
+        res.status(200).json({
+            status: "persisted_and_published",
+            user: {
+                ...existingUser,
+                gdprConsent: false,
+            },
+            deactivatedAt,
+        });
+    } catch (error) {
+        handleApiError(res, error, {
+            publishFailedMessage:
+                "User was deactivated locally but deactivation message publication failed",
+        });
+    }
+});
+
 app.get("/", (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
 });

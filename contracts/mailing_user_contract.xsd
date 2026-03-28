@@ -34,6 +34,10 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="ISO8601DateTimeType">
+    <xs:restriction base="xs:dateTime"/>
+  </xs:simpleType>
+
   <!-- ============================================================
        CANONICAL PAYLOAD FOR Mailing -> CRM USER SYNC
        Required: id, email, gdprConsent
@@ -63,5 +67,20 @@
        Full object is required for consistency.
   ============================================================ -->
   <xs:element name="MailingUserUpdated" type="MailingUserPayloadType"/>
+
+  <!-- ============================================================
+       SCENARIO 3 — Mailing -> CRM: user deactivated
+       Routing key: mailing.user.deactivated | Topic: user.topic
+       Used for GDPR deactivation/cancellation propagation.
+  ============================================================ -->
+  <xs:element name="MailingUserDeactivated">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="id"            type="UUIDType"/>
+        <xs:element name="email"         type="EmailType"/>
+        <xs:element name="deactivatedAt" type="ISO8601DateTimeType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
 
 </xs:schema>

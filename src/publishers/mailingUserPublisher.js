@@ -99,6 +99,19 @@ function toMailingUserXml(rootElement, rawUser) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<${rootElement}><id>${escapeXml(user.id)}</id><email>${escapeXml(user.email)}</email>${optionalTags}<gdprConsent>${user.gdprConsent}</gdprConsent></${rootElement}>`;
 }
 
+function toMailingUserDeactivatedXml(rawUser) {
+    const payload = {
+        id: normalizeRequiredXmlString(rawUser.id, "id"),
+        email: normalizeRequiredXmlString(rawUser.email, "email"),
+        deactivatedAt: normalizeRequiredXmlString(
+            rawUser.deactivatedAt,
+            "deactivatedAt",
+        ),
+    };
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<MailingUserDeactivated><id>${escapeXml(payload.id)}</id><email>${escapeXml(payload.email)}</email><deactivatedAt>${escapeXml(payload.deactivatedAt)}</deactivatedAt></MailingUserDeactivated>`;
+}
+
 function validateMailingUserWithXmllint(xml) {
     return new Promise((resolve, reject) => {
         const child = spawn(
@@ -155,6 +168,9 @@ function createMailingUserPublisher() {
         process.env.MAILING_USER_CREATED_ROUTING_KEY || "mailing.user.created";
     const updatedRoutingKey =
         process.env.MAILING_USER_UPDATED_ROUTING_KEY || "mailing.user.updated";
+    const deactivatedRoutingKey =
+        process.env.MAILING_USER_DEACTIVATED_ROUTING_KEY ||
+        "mailing.user.deactivated";
     const rabbitUrl = buildRabbitUrlFromEnv();
 
     let connection;
@@ -212,12 +228,11 @@ function createMailingUserPublisher() {
         return true;
     }
 
-    async function publish(rootElement, routingKey, user) {
+    async function publish(rootElement, routingKey, xml) {
         if (!(await ensureChannel())) {
             return;
         }
 
-        const xml = toMailingUserXml(rootElement, user);
         await validateMailingUserWithXmllint(xml);
 
         const published = channel.publish(
@@ -239,11 +254,27 @@ function createMailingUserPublisher() {
     }
 
     async function publishUserCreated(user) {
-        await publish("MailingUserCreated", createdRoutingKey, user);
+        await publish(
+            "MailingUserCreated",
+            createdRoutingKey,
+            toMailingUserXml("MailingUserCreated", user),
+        );
     }
 
     async function publishUserUpdated(user) {
-        await publish("MailingUserUpdated", updatedRoutingKey, user);
+        await publish(
+            "MailingUserUpdated",
+            updatedRoutingKey,
+            toMailingUserXml("MailingUserUpdated", user),
+        );
+    }
+
+    async function publishUserDeactivated(user) {
+        await publish(
+            "MailingUserDeactivated",
+            deactivatedRoutingKey,
+            toMailingUserDeactivatedXml(user),
+        );
     }
 
     async function start() {
@@ -272,6 +303,7 @@ function createMailingUserPublisher() {
         stop,
         publishUserCreated,
         publishUserUpdated,
+        publishUserDeactivated,
     };
 }
 

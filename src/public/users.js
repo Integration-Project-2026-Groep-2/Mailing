@@ -48,13 +48,59 @@ function setRows(users) {
                     <td>
                         <div class="actions">
                             <a class="button button-secondary" href="/users/${id}/edit">Edit</a>
-                            <button class="button button-danger" type="button" disabled title="Delete functionality comes later">Delete</button>
+                            <button
+                                class="button button-danger deactivate-user-btn"
+                                type="button"
+                                data-user-id="${id}"
+                                data-user-email="${escapeHtml(user.email)}"
+                            >
+                                Deactivate
+                            </button>
                         </div>
                     </td>
                 </tr>
             `;
         })
         .join("");
+}
+
+async function deactivateUser(userId, userEmail) {
+    if (!userId) {
+        return;
+    }
+
+    const shouldDeactivate = window.confirm(
+        `Deactivate ${userEmail || "this user"}? This sets gdprConsent to false and notifies CRM.`,
+    );
+    if (!shouldDeactivate) {
+        return;
+    }
+
+    statusEl.textContent = "Deactivating user...";
+
+    try {
+        const response = await fetch(
+            `/users/${encodeURIComponent(userId)}/deactivate`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            },
+        );
+
+        const responseBody = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(
+                responseBody.error || `Request failed (${response.status})`,
+            );
+        }
+
+        statusEl.textContent = `User deactivated and CRM notified at ${new Date().toLocaleTimeString()}.`;
+        await loadUsers();
+    } catch (error) {
+        statusEl.textContent = `Failed to deactivate user: ${error.message}`;
+    }
 }
 
 async function loadUsers() {
@@ -77,6 +123,21 @@ async function loadUsers() {
 
 refreshBtn.addEventListener("click", () => {
     loadUsers();
+});
+
+usersBody.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+
+    if (!target.classList.contains("deactivate-user-btn")) {
+        return;
+    }
+
+    const userId = target.dataset.userId;
+    const userEmail = target.dataset.userEmail;
+    deactivateUser(userId, userEmail);
 });
 
 loadUsers();

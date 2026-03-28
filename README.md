@@ -80,6 +80,7 @@ Optional outbound Mailing user publish variables:
 - `MAILING_USER_EXCHANGE_TYPE` (default: `topic`)
 - `MAILING_USER_CREATED_ROUTING_KEY` (default: `mailing.user.created`)
 - `MAILING_USER_UPDATED_ROUTING_KEY` (default: `mailing.user.updated`)
+- `MAILING_USER_DEACTIVATED_ROUTING_KEY` (default: `mailing.user.deactivated`)
 
 ## Run with Docker Compose
 
@@ -111,6 +112,7 @@ docker compose -f compose.yml down -v
 - `GET /users`: list up to 100 users
 - `POST /users`: persist user locally, then publish `mailing.user.created`
 - `PUT /users/:id`: persist update locally, then publish `mailing.user.updated` (email immutable)
+- `POST /users/:id/deactivate`: force `gdprConsent=false` locally, then publish `mailing.user.deactivated`
 
 ## Heartbeat publishing
 
@@ -157,6 +159,15 @@ Create and update execute in this order:
 For create, the service first stores a locally generated UUID. If CRM later confirms the same email with a different official UUID on `crm.user.confirmed`, the consumer reconciles the local user id to the CRM id.
 
 If persistence succeeds but publish fails, the API returns `502` with `persisted=true`.
+
+## Outbound deactivation sync
+
+When the Deactivate action is used in the user list, the service executes:
+
+1. Persist deactivation in MariaDB (`gdprConsent = false`)
+2. Publish `mailing.user.deactivated` to `user.topic`
+
+The outbound XML is validated against `contracts/mailing_user_contract.xsd` before publish. The message includes `id`, `email`, and `deactivatedAt`.
 
 When Compose is running with default values:
 
