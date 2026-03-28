@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Mailing Outbound User Schema — contracts for Mailing -> CRM
+  Integration Project 2025/2026 | Groep 2
+  Version 1.0 — Maart 2026
+
+  Scope:
+  - Scenario 1: mailing.user.created + mailing.user.updated
+  - Scenario 2: mailing.user.updated
+
+  This schema is intentionally aligned with the persisted user fields in Mailing DB:
+  id, email, firstName, lastName, gdprConsent, companyId.
+
+  No targetNamespace: queue XML payloads do not use namespace declarations.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="unqualified"
+           version="1.1">
+
+  <!-- ============================================================
+       SHARED SIMPLE TYPES
+  ============================================================ -->
+
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="EmailType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[^@\s]+@[^@\s]+\.[^@\s]+"/>
+      <xs:maxLength value="254"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ISO8601DateTimeType">
+    <xs:restriction base="xs:dateTime"/>
+  </xs:simpleType>
+
+  <!-- ============================================================
+       CANONICAL PAYLOAD FOR Mailing -> CRM USER SYNC
+       Required: id, email, gdprConsent
+       Optional: firstName, lastName, companyId
+  ============================================================ -->
+
+  <xs:complexType name="MailingUserPayloadType">
+    <xs:sequence>
+      <xs:element name="id"          type="UUIDType"/>
+      <xs:element name="email"       type="EmailType"/>
+      <xs:element name="firstName"   type="xs:string" minOccurs="0" nillable="true"/>
+      <xs:element name="lastName"    type="xs:string" minOccurs="0" nillable="true"/>
+      <xs:element name="gdprConsent" type="xs:boolean"/>
+      <xs:element name="companyId"   type="UUIDType" minOccurs="0" nillable="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ============================================================
+       SCENARIO 1a — Mailing -> CRM: create user sync request
+       Routing key: mailing.user.created | Topic: user.topic
+  ============================================================ -->
+  <xs:element name="MailingUserCreated" type="MailingUserPayloadType"/>
+
+  <!-- ============================================================
+       SCENARIO 1b + 2 — Mailing -> CRM: update user sync request
+       Routing key: mailing.user.updated | Topic: user.topic
+       Full object is required for consistency.
+  ============================================================ -->
+  <xs:element name="MailingUserUpdated" type="MailingUserPayloadType"/>
+
+  <!-- ============================================================
+       SCENARIO 3 — Mailing -> CRM: user deactivated
+       Routing key: mailing.user.deactivated | Topic: user.topic
+       Used for GDPR deactivation/cancellation propagation.
+  ============================================================ -->
+  <xs:element name="MailingUserDeactivated">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="id"            type="UUIDType"/>
+        <xs:element name="email"         type="EmailType"/>
+        <xs:element name="deactivatedAt" type="ISO8601DateTimeType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

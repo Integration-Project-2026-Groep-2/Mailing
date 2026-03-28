@@ -24,6 +24,11 @@ function setField(id, value) {
     }
 }
 
+function normalizeOptional(value) {
+    const normalized = String(value ?? "").trim();
+    return normalized === "" ? null : normalized;
+}
+
 async function loadUser() {
     const userId = getUserIdFromPath();
     if (!userId) {
@@ -53,7 +58,7 @@ async function loadUser() {
         setField("firstName", user.firstName);
         setField("lastName", user.lastName);
         setField("gdprConsent", user.gdprConsent ? "true" : "false");
-        setField("companyId", user.companyId || "-");
+        setField("companyId", user.companyId || "");
 
         editStatusEl.textContent = `Loaded user: ${escapeHtml(user.email)}`;
         editStatusEl.classList.remove("error-state");
@@ -63,10 +68,58 @@ async function loadUser() {
     }
 }
 
-editForm.addEventListener("submit", (event) => {
+editForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    editStatusEl.textContent = "Update action is not implemented yet.";
+
+    const userId = getUserIdFromPath();
+    if (!userId) {
+        editStatusEl.textContent = "Invalid user id in URL.";
+        editStatusEl.classList.add("error-state");
+        return;
+    }
+
+    const payload = {
+        email: normalizeOptional(document.getElementById("email")?.value),
+        firstName: normalizeOptional(
+            document.getElementById("firstName")?.value,
+        ),
+        lastName: normalizeOptional(document.getElementById("lastName")?.value),
+        gdprConsent:
+            String(document.getElementById("gdprConsent")?.value) === "true",
+        companyId: normalizeOptional(
+            document.getElementById("companyId")?.value,
+        ),
+    };
+
+    editStatusEl.textContent = "Saving and publishing update...";
     editStatusEl.classList.remove("error-state");
+
+    try {
+        const response = await fetch(`/users/${encodeURIComponent(userId)}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const responseBody = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(
+                responseBody.error || `Request failed (${response.status})`,
+            );
+        }
+
+        const updated = responseBody.user || {};
+        setField("firstName", updated.firstName);
+        setField("lastName", updated.lastName);
+        setField("gdprConsent", updated.gdprConsent ? "true" : "false");
+        setField("companyId", updated.companyId || "");
+        editStatusEl.textContent = "User updated and sync event published.";
+    } catch (error) {
+        editStatusEl.textContent = `Failed to update user: ${error.message}`;
+        editStatusEl.classList.add("error-state");
+    }
 });
 
 loadUser();

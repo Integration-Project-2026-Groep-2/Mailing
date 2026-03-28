@@ -1,34 +1,20 @@
 const amqp = require("amqplib");
+const path = require("path");
+const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+
+const userContractPath = path.resolve(
+    __dirname,
+    "../../contracts/user_data_contract.xsd",
+);
 
 const UUID_V4_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ISO_DATETIME_REGEX =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
-const ALLOWED_ROLES = new Set([
-    "VISITOR",
-    "COMPANY_CONTACT",
-    "SPEAKER",
-    "EVENT_MANAGER",
-    "CASHIER",
-    "BAR_STAFF",
-    "ADMIN",
-]);
-const ALLOWED_USER_FIELDS = new Set([
-    "id",
-    "firstName",
-    "lastName",
-    "email",
-    "phone",
-    "companyId",
-    "role",
-    "badgeCode",
-    "isActive",
-    "gdprConsent",
-    "confirmedAt",
-]);
+const ALLOWED_FIELDS = new Set(["id", "email", "deactivatedAt"]);
 
 function parseBoolean(value, defaultValue = true) {
     if (value === undefined || value === null || value === "") {
@@ -82,17 +68,65 @@ function createValidationError(message) {
     return error;
 }
 
-function createCrmUserConfirmedConsumer({
-    userRepository,
-    mailLogRepository,
-    sendgridService,
-}) {
-    const enabled = parseBoolean(process.env.CRM_USER_SYNC_ENABLED, true);
-    const exchange = process.env.CRM_USER_EXCHANGE || "contact.topic";
-    const exchangeType = process.env.CRM_USER_EXCHANGE_TYPE || "topic";
-    const queue = process.env.CRM_USER_QUEUE || "mailing.user.confirmed";
-    const routingKey = process.env.CRM_USER_ROUTING_KEY || "crm.user.confirmed";
-    const prefetch = Number(process.env.CRM_USER_PREFETCH || 10);
+function validateWithXmllint(xml) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(
+            "xmllint",
+            ["--noout", "--schema", userContractPath, "-"],
+            { stdio: ["pipe", "pipe", "pipe"] },
+        );
+
+        let stderr = "";
+
+        child.stderr.on("data", (data) => {
+            stderr += data.toString();
+        });
+
+        child.on("error", (error) => {
+            if (error.code === "ENOENT") {
+                reject(
+                    createValidationError(
+                        "xmllint is required for crm.user.deactivated XSD validation but was not found",
+                    ),
+                );
+                return;
+            }
+
+            reject(error);
+        });
+
+        child.on("close", (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(
+                createValidationError(
+                    `crm.user.deactivated XML failed XSD validation: ${stderr.trim() || "unknown xmllint error"}`,
+                ),
+            );
+        });
+
+        child.stdin.write(xml);
+        child.stdin.end();
+    });
+}
+
+function createCrmUserDeactivatedConsumer({ userRepository }) {
+    const enabled = parseBoolean(
+        process.env.CRM_USER_DEACTIVATED_SYNC_ENABLED,
+        true,
+    );
+    const exchange =
+        process.env.CRM_USER_DEACTIVATED_EXCHANGE || "contact.topic";
+    const exchangeType =
+        process.env.CRM_USER_DEACTIVATED_EXCHANGE_TYPE || "topic";
+    const queue =
+        process.env.CRM_USER_DEACTIVATED_QUEUE || "mailing.user.deactivated";
+    const routingKey =
+        process.env.CRM_USER_DEACTIVATED_ROUTING_KEY || "crm.user.deactivated";
+    const prefetch = Number(process.env.CRM_USER_DEACTIVATED_PREFETCH || 10);
     const rabbitUrl = buildRabbitUrlFromEnv();
 
     const xmlParser = new XMLParser({
@@ -121,7 +155,7 @@ function createCrmUserConfirmedConsumer({
 
                 if (!Number.isFinite(prefetch) || prefetch <= 0) {
                     throw new Error(
-                        "CRM_USER_PREFETCH must be a positive number",
+                        "CRM_USER_DEACTIVATED_PREFETCH must be a positive number",
                     );
                 }
 
@@ -134,17 +168,17 @@ function createCrmUserConfirmedConsumer({
 
                 connection.on("error", (error) => {
                     console.error(
-                        `RabbitMQ crm.user.confirmed connection error: ${error.message}`,
+                        `RabbitMQ crm.user.deactivated connection error: ${error.message}`,
                     );
                 });
 
                 console.log(
-                    `CRM user consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
+                    `CRM user deactivated consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
                 console.error(
-                    `CRM user consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
+                    `CRM user deactivated consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
                 if (attempt === maxRetries) {
@@ -158,7 +192,7 @@ function createCrmUserConfirmedConsumer({
         }
     }
 
-    function extractUserFromXml(xmlContent) {
+    function extractPayload(xmlContent) {
         let parsed;
         try {
             parsed = xmlParser.parse(xmlContent);
@@ -168,102 +202,44 @@ function createCrmUserConfirmedConsumer({
             );
         }
 
-        const user = parsed?.UserConfirmed || parsed?.user;
-        if (!user || typeof user !== "object") {
+        const payload = parsed?.UserDeactivated || parsed?.userDeactivated;
+        if (!payload || typeof payload !== "object") {
             throw createValidationError(
-                "Expected root <UserConfirmed> element in payload",
+                "Expected root <UserDeactivated> element in payload",
             );
         }
 
-        const unexpectedFields = Object.keys(user).filter(
-            (fieldName) => !ALLOWED_USER_FIELDS.has(fieldName),
+        const unexpectedFields = Object.keys(payload).filter(
+            (fieldName) => !ALLOWED_FIELDS.has(fieldName),
         );
         if (unexpectedFields.length > 0) {
             throw createValidationError(
-                `Unexpected fields in UserConfirmed payload: ${unexpectedFields.join(
-                    ", ",
-                )}`,
+                `Unexpected fields in UserDeactivated payload: ${unexpectedFields.join(", ")}`,
             );
         }
 
         return {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            gdprConsent: user.gdprConsent,
-            companyId: user.companyId,
-            confirmedAt: user.confirmedAt,
-            role: user.role,
-            isActive: user.isActive,
+            id: payload.id,
+            email: payload.email,
+            deactivatedAt: payload.deactivatedAt,
         };
     }
 
-    function isValidOptionalIsoDate(value) {
-        if (value === undefined || value === null || value === "") {
-            return true;
-        }
-
-        return ISO_DATETIME_REGEX.test(String(value));
-    }
-
-    function validateUserContract(user) {
-        if (!UUID_V4_REGEX.test(String(user.id || ""))) {
+    function validatePayload(payload) {
+        if (!UUID_V4_REGEX.test(String(payload.id || ""))) {
             throw createValidationError(
                 "Invalid or missing id (UUID v4 required)",
             );
         }
 
-        const email = String(user.email || "");
+        const email = String(payload.email || "");
         if (!EMAIL_REGEX.test(email) || email.length > 254) {
             throw createValidationError("Invalid or missing email");
         }
 
-        const firstName = String(user.firstName || "");
-        if (firstName.length === 0 || firstName.length > 80) {
+        if (!ISO_DATETIME_REGEX.test(String(payload.deactivatedAt || ""))) {
             throw createValidationError(
-                "Invalid or missing firstName (max length 80)",
-            );
-        }
-
-        const lastName = String(user.lastName || "");
-        if (lastName.length === 0 || lastName.length > 80) {
-            throw createValidationError(
-                "Invalid or missing lastName (max length 80)",
-            );
-        }
-
-        if (!ALLOWED_ROLES.has(String(user.role || ""))) {
-            throw createValidationError("Invalid or missing role");
-        }
-
-        if (!["true", "false", true, false, "1", "0"].includes(user.isActive)) {
-            throw createValidationError(
-                "Invalid or missing isActive boolean value",
-            );
-        }
-
-        if (
-            !["true", "false", true, false, "1", "0"].includes(user.gdprConsent)
-        ) {
-            throw createValidationError(
-                "Invalid or missing gdprConsent boolean value",
-            );
-        }
-
-        if (!isValidOptionalIsoDate(user.confirmedAt)) {
-            throw createValidationError(
-                "Invalid or missing confirmedAt ISO datetime",
-            );
-        }
-
-        if (user.companyId && !UUID_V4_REGEX.test(String(user.companyId))) {
-            throw createValidationError("Invalid companyId (UUID v4 required)");
-        }
-
-        if (String(user.role) === "COMPANY_CONTACT" && !user.companyId) {
-            throw createValidationError(
-                "companyId is required when role is COMPANY_CONTACT",
+                "Invalid or missing deactivatedAt ISO datetime",
             );
         }
     }
@@ -271,43 +247,35 @@ function createCrmUserConfirmedConsumer({
     async function processMessage(msg) {
         const xmlContent = msg.content.toString("utf8");
 
-        const rawUser = extractUserFromXml(xmlContent);
-        validateUserContract(rawUser);
+        await validateWithXmllint(xmlContent);
+
+        const payload = extractPayload(xmlContent);
+        validatePayload(payload);
 
         const existingByEmail = await userRepository.findUserByEmail(
-            rawUser.email,
+            payload.email,
         );
-        if (existingByEmail && existingByEmail.id !== rawUser.id) {
+        if (existingByEmail && existingByEmail.id !== payload.id) {
             const existingByCrmId = await userRepository.findUserById(
-                rawUser.id,
+                payload.id,
             );
             if (!existingByCrmId) {
                 await userRepository.replaceUserId(
                     existingByEmail.id,
-                    rawUser.id,
+                    payload.id,
                 );
             }
         }
 
-        const persistedUser = await userRepository.upsertUser(rawUser);
+        const affectedRows = await userRepository.deactivateUserByIdentity({
+            id: payload.id,
+            email: payload.email,
+        });
 
-        try {
-            await sendgridService.sendUserConfirmedEmail({
-                ...persistedUser,
-                confirmedAt: rawUser.confirmedAt,
-            });
-            await mailLogRepository.insertMailLog({
-                userId: persistedUser.id,
-                templateId: sendgridService.confirmationTemplateId,
-                status: "SENT",
-            });
-        } catch (error) {
-            await mailLogRepository.insertMailLog({
-                userId: persistedUser.id,
-                templateId: sendgridService.confirmationTemplateId,
-                status: "FAILED",
-            });
-            throw error;
+        if (affectedRows === 0) {
+            console.warn(
+                `No user found to deactivate for id='${payload.id}', email='${payload.email}'.`,
+            );
         }
     }
 
@@ -322,15 +290,7 @@ function createCrmUserConfirmedConsumer({
         } catch (error) {
             if (isValidationError(error)) {
                 console.error(
-                    `Rejecting invalid crm.user.confirmed payload: ${error.message}`,
-                );
-                channel.nack(msg, false, false);
-                return;
-            }
-
-            if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) {
-                console.error(
-                    `Rejecting crm.user.confirmed payload due to duplicate key conflict: ${error.message}`,
+                    `Rejecting invalid crm.user.deactivated payload: ${error.message}`,
                 );
                 channel.nack(msg, false, false);
                 return;
@@ -338,7 +298,7 @@ function createCrmUserConfirmedConsumer({
 
             const shouldRequeue = isTransientError(error);
             console.error(
-                `Failed processing crm.user.confirmed payload (requeue=${shouldRequeue}): ${error.message}`,
+                `Failed processing crm.user.deactivated payload (requeue=${shouldRequeue}): ${error.message}`,
             );
             channel.nack(msg, false, shouldRequeue);
         }
@@ -346,7 +306,7 @@ function createCrmUserConfirmedConsumer({
 
     async function start() {
         if (!enabled) {
-            console.log("CRM user sync consumer is disabled");
+            console.log("CRM user deactivated consumer is disabled");
             return;
         }
 
@@ -375,5 +335,5 @@ function createCrmUserConfirmedConsumer({
 }
 
 module.exports = {
-    createCrmUserConfirmedConsumer,
+    createCrmUserDeactivatedConsumer,
 };

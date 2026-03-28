@@ -64,6 +64,24 @@ Optional CRM user sync variables:
 - `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
 - `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
 
+Optional CRM user deactivated sync variables:
+
+- `CRM_USER_DEACTIVATED_SYNC_ENABLED` (default: `true`)
+- `CRM_USER_DEACTIVATED_EXCHANGE` (default: `contact.topic`)
+- `CRM_USER_DEACTIVATED_EXCHANGE_TYPE` (default: `topic`)
+- `CRM_USER_DEACTIVATED_QUEUE` (default: `mailing.user.deactivated`)
+- `CRM_USER_DEACTIVATED_ROUTING_KEY` (default: `crm.user.deactivated`)
+- `CRM_USER_DEACTIVATED_PREFETCH` (default: `10`)
+
+Optional outbound Mailing user publish variables:
+
+- `MAILING_USER_PUBLISH_ENABLED` (default: `true`)
+- `MAILING_USER_EXCHANGE` (default: `user.topic`)
+- `MAILING_USER_EXCHANGE_TYPE` (default: `topic`)
+- `MAILING_USER_CREATED_ROUTING_KEY` (default: `mailing.user.created`)
+- `MAILING_USER_UPDATED_ROUTING_KEY` (default: `mailing.user.updated`)
+- `MAILING_USER_DEACTIVATED_ROUTING_KEY` (default: `mailing.user.deactivated`)
+
 ## Run with Docker Compose
 
 ```bash
@@ -92,6 +110,9 @@ docker compose -f compose.yml down -v
 
 - `GET /health`: service + database health check
 - `GET /users`: list up to 100 users
+- `POST /users`: persist user locally, then publish `mailing.user.created`
+- `PUT /users/:id`: persist update locally, then publish `mailing.user.updated` (email immutable)
+- `POST /users/:id/deactivate`: force `gdprConsent=false` locally, then publish `mailing.user.deactivated`
 
 ## Heartbeat publishing
 
@@ -119,6 +140,34 @@ For every valid message:
 - Writes status entries into `mail_logs` with `SENT` or `FAILED`
 
 Payloads that fail XML/XSD validation are rejected without requeue. Transient infrastructure failures are nacked with requeue.
+
+## CRM user deactivated consumption
+
+The service consumes `crm.user.deactivated` from `contact.topic` and validates payloads against `contracts/user_data_contract.xsd` (Contract 22: `id`, `email`, `deactivatedAt`).
+
+For valid deactivation messages, the service marks the user as deactivated for mailing by setting `gdprConsent = false`. This ensures future mailing is stopped for GDPR deactivation/cancellation requests.
+
+Sample payload for this flow is available at `tests/crm_user_deactivated_sample.xml`.
+
+## Outbound create/update sync
+
+Create and update execute in this order:
+
+1. Persist in MariaDB
+2. Publish XML to RabbitMQ
+
+For create, the service first stores a locally generated UUID. If CRM later confirms the same email with a different official UUID on `crm.user.confirmed`, the consumer reconciles the local user id to the CRM id.
+
+If persistence succeeds but publish fails, the API returns `502` with `persisted=true`.
+
+## Outbound deactivation sync
+
+When the Deactivate action is used in the user list, the service executes:
+
+1. Persist deactivation in MariaDB (`gdprConsent = false`)
+2. Publish `mailing.user.deactivated` to `user.topic`
+
+The outbound XML is validated against `contracts/mailing_user_contract.xsd` before publish. The message includes `id`, `email`, and `deactivatedAt`.
 
 When Compose is running with default values:
 
