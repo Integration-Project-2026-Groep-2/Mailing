@@ -78,7 +78,7 @@ function toMailingUserXml(rootElement, rawUser) {
         email: normalizeRequiredXmlString(rawUser.email, "email"),
         firstName: normalizeOptionalXmlString(rawUser.firstName),
         lastName: normalizeOptionalXmlString(rawUser.lastName),
-        gdprConsent: normalizeBoolean(rawUser.gdprConsent, "gdprConsent"),
+        isActive: normalizeBoolean(rawUser.isActive, "isActive"),
         companyId: normalizeOptionalXmlString(rawUser.companyId),
     };
 
@@ -96,7 +96,7 @@ function toMailingUserXml(rootElement, rawUser) {
         .filter(Boolean)
         .join("");
 
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<${rootElement}><id>${escapeXml(user.id)}</id><email>${escapeXml(user.email)}</email>${optionalTags}<gdprConsent>${user.gdprConsent}</gdprConsent></${rootElement}>`;
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<${rootElement}><id>${escapeXml(user.id)}</id><email>${escapeXml(user.email)}</email>${optionalTags}<isActive>${user.isActive}</isActive></${rootElement}>`;
 }
 
 function toMailingUserDeactivatedXml(rawUser) {

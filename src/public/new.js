@@ -14,7 +14,7 @@ createForm.addEventListener("submit", async (event) => {
         email: String(formData.get("email") || "").trim(),
         firstName: normalizeOptional(String(formData.get("firstName") || "")),
         lastName: normalizeOptional(String(formData.get("lastName") || "")),
-        gdprConsent: String(formData.get("gdprConsent") || "false") === "true",
+        isActive: String(formData.get("isActive") || "true") === "true",
         companyId: normalizeOptional(String(formData.get("companyId") || "")),
     };
 

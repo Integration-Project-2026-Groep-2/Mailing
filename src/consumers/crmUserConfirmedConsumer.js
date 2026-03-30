@@ -26,7 +26,6 @@ const ALLOWED_USER_FIELDS = new Set([
     "role",
     "badgeCode",
     "isActive",
-    "gdprConsent",
     "confirmedAt",
 ]);
 
@@ -191,11 +190,10 @@ function createCrmUserConfirmedConsumer({
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            gdprConsent: user.gdprConsent,
+            isActive: user.isActive,
             companyId: user.companyId,
             confirmedAt: user.confirmedAt,
             role: user.role,
-            isActive: user.isActive,
         };
     }
 
@@ -240,14 +238,6 @@ function createCrmUserConfirmedConsumer({
         if (!["true", "false", true, false, "1", "0"].includes(user.isActive)) {
             throw createValidationError(
                 "Invalid or missing isActive boolean value",
-            );
-        }
-
-        if (
-            !["true", "false", true, false, "1", "0"].includes(user.gdprConsent)
-        ) {
-            throw createValidationError(
-                "Invalid or missing gdprConsent boolean value",
             );
         }
 

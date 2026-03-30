@@ -142,7 +142,7 @@ function parseCreateUserPayload(body) {
         email: normalizeEmail(payload.email),
         firstName: normalizeOptionalString(payload.firstName),
         lastName: normalizeOptionalString(payload.lastName),
-        gdprConsent: normalizeBoolean(payload.gdprConsent, "gdprConsent"),
+        isActive: normalizeBoolean(payload.isActive, "isActive"),
         companyId: normalizeOptionalUuid(payload.companyId, "companyId"),
     };
 }
@@ -158,7 +158,7 @@ function parseUpdateUserPayload(existingUser, body) {
         throw createValidationError("Email is immutable and cannot be changed");
     }
 
-    const hasGdprConsent = payload.gdprConsent !== undefined;
+    const hasIsActive = payload.isActive !== undefined;
 
     return {
         id: existingUser.id,
@@ -171,9 +171,9 @@ function parseUpdateUserPayload(existingUser, body) {
             payload.lastName === undefined
                 ? existingUser.lastName
                 : normalizeOptionalString(payload.lastName),
-        gdprConsent: hasGdprConsent
-            ? normalizeBoolean(payload.gdprConsent, "gdprConsent")
-            : existingUser.gdprConsent,
+        isActive: hasIsActive
+            ? normalizeBoolean(payload.isActive, "isActive")
+            : existingUser.isActive,
         companyId:
             payload.companyId === undefined
                 ? existingUser.companyId
@@ -254,7 +254,7 @@ app.get("/health", async (_req, res) => {
 app.get("/users", async (_req, res) => {
     try {
         const [rows] = await pool.query(
-            "SELECT id, email, firstName, lastName, gdprConsent, companyId, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 100",
+            "SELECT id, email, firstName, lastName, isActive, companyId, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 100",
         );
         res.status(200).json(rows);
     } catch (error) {
@@ -371,7 +371,7 @@ app.post("/users/:id/deactivate", async (req, res) => {
             status: "persisted_and_published",
             user: {
                 ...existingUser,
-                gdprConsent: false,
+                isActive: false,
             },
             deactivatedAt,
         });

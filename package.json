@@ -5,7 +5,8 @@
     "main": "src/server.js",
     "scripts": {
         "start": "node src/server.js",
-        "dev": "node --watch src/server.js"
+        "dev": "node --watch src/server.js",
+        "migrate:isactive": "node src/scripts/migrateGdprConsentToIsActive.js"
     },
     "dependencies": {
         "@sendgrid/mail": "^8.1.6",

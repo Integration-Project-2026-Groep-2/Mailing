@@ -121,7 +121,7 @@ docker compose -f compose.yml down -v
 - `GET /users`: list up to 100 users
 - `POST /users`: persist user locally, then publish `mailing.user.created`
 - `PUT /users/:id`: persist update locally, then publish `mailing.user.updated` (email immutable)
-- `POST /users/:id/deactivate`: force `gdprConsent=false` locally, then publish `mailing.user.deactivated`
+- `POST /users/:id/deactivate`: force `isActive=false` locally, then publish `mailing.user.deactivated`
 
 ## Heartbeat publishing
 
@@ -144,7 +144,7 @@ The service consumes `crm.user.confirmed` events from RabbitMQ and validates `Us
 
 For every valid message:
 
-- Upserts `users` with only `id`, `email`, `firstName`, `lastName`, `gdprConsent`, and `companyId`
+- Upserts `users` with only `id`, `email`, `firstName`, `lastName`, `isActive`, and `companyId`
 - Sends a SendGrid dynamic template email using `SENDGRID_USER_CONFIRMED_TEMPLATE_ID`
 - Writes status entries into `mail_logs` with `SENT` or `FAILED`
 
@@ -154,7 +154,7 @@ Payloads that fail XML/XSD validation are rejected without requeue. Transient in
 
 The service consumes `crm.user.deactivated` from `contact.topic` and validates payloads against `contracts/user_data_contract.xsd` (Contract 22: `id`, `email`, `deactivatedAt`).
 
-For valid deactivation messages, the service marks the user as deactivated for mailing by setting `gdprConsent = false`. This ensures future mailing is stopped for GDPR deactivation/cancellation requests.
+For valid deactivation messages, the service marks the user as deactivated for mailing by setting `isActive = false`. This ensures future mailing is stopped for deactivation/cancellation requests.
 
 Sample payload for this flow is available at `tests/crm_user_deactivated_sample.xml`.
 
@@ -162,7 +162,7 @@ Sample payload for this flow is available at `tests/crm_user_deactivated_sample.
 
 The service consumes `crm.user.updated` from `contact.topic` and always validates the incoming XML against `contracts/user_data_contract.xsd` Contract 18 (`UserUpdated`).
 
-After XSD validation, the consumer applies strict payload checks and rejects unexpected fields. Valid messages are acknowledged and persisted through the existing `users` repository mapping (`id`, `email`, `firstName`, `lastName`, `gdprConsent`, `companyId`).
+After XSD validation, the consumer applies strict payload checks and rejects unexpected fields. Valid messages are acknowledged and persisted through the existing `users` repository mapping (`id`, `email`, `firstName`, `lastName`, `isActive`, `companyId`).
 
 ## Outbound create/update sync
 
@@ -179,7 +179,7 @@ If persistence succeeds but publish fails, the API returns `502` with `persisted
 
 When the Deactivate action is used in the user list, the service executes:
 
-1. Persist deactivation in MariaDB (`gdprConsent = false`)
+1. Persist deactivation in MariaDB (`isActive = false`)
 2. Publish `mailing.user.deactivated` to `user.topic`
 
 The outbound XML is validated against `contracts/mailing_user_contract.xsd` before publish. The message includes `id`, `email`, and `deactivatedAt`.

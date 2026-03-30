@@ -57,7 +57,7 @@ async function loadUser() {
         setField("email", user.email);
         setField("firstName", user.firstName);
         setField("lastName", user.lastName);
-        setField("gdprConsent", user.gdprConsent ? "true" : "false");
+        setField("isActive", user.isActive ? "true" : "false");
         setField("companyId", user.companyId || "");
 
         editStatusEl.textContent = `Loaded user: ${escapeHtml(user.email)}`;
@@ -84,8 +84,7 @@ editForm.addEventListener("submit", async (event) => {
             document.getElementById("firstName")?.value,
         ),
         lastName: normalizeOptional(document.getElementById("lastName")?.value),
-        gdprConsent:
-            String(document.getElementById("gdprConsent")?.value) === "true",
+        isActive: String(document.getElementById("isActive")?.value) === "true",
         companyId: normalizeOptional(
             document.getElementById("companyId")?.value,
         ),
@@ -113,7 +112,7 @@ editForm.addEventListener("submit", async (event) => {
         const updated = responseBody.user || {};
         setField("firstName", updated.firstName);
         setField("lastName", updated.lastName);
-        setField("gdprConsent", updated.gdprConsent ? "true" : "false");
+        setField("isActive", updated.isActive ? "true" : "false");
         setField("companyId", updated.companyId || "");
         editStatusEl.textContent = "User updated and sync event published.";
     } catch (error) {

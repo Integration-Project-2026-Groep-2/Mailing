@@ -38,7 +38,7 @@ CREATE TABLE users (
     email VARCHAR(254) UNIQUE NOT NULL,
     firstName VARCHAR(80),
     lastName VARCHAR(80),
-    gdprConsent BOOLEAN NOT NULL DEFAULT FALSE,
+    isActive BOOLEAN NOT NULL DEFAULT TRUE,
     companyId UUID NULL,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -63,6 +63,6 @@ CREATE TABLE mail_logs (
 
 ## Business Rules & Compliance
 
-- **GDPR First:** Before calling SendGrid, the service checks the `gdprConsent` flag. If `false`, the mail is suppressed unless it is a "Transactional Receipt" (legitimate interest).
+- **Soft Delete Gate:** Before calling SendGrid, the service checks the `isActive` flag. If `false`, mail delivery is suppressed.
 - **Universal Delivery:** Every visitor receives a digital proof of entry/payment, regardless of company affiliation.
 - **Soft Delete:** Respects the `isActive` flag from the CRM schema; inactive users should not receive marketing materials.
