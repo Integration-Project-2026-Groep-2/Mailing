@@ -42,7 +42,7 @@ function setRows(users) {
                     <td>${escapeHtml(user.email)}</td>
                     <td>${escapeHtml(user.firstName)}</td>
                     <td>${escapeHtml(user.lastName)}</td>
-                    <td>${user.gdprConsent ? "true" : "false"}</td>
+                    <td>${user.isActive ? "true" : "false"}</td>
                     <td>${escapeHtml(user.companyId || "-")}</td>
                     <td>${escapeHtml(formatDate(user.updatedAt))}</td>
                     <td>
@@ -70,7 +70,7 @@ async function deactivateUser(userId, userEmail) {
     }
 
     const shouldDeactivate = window.confirm(
-        `Deactivate ${userEmail || "this user"}? This sets gdprConsent to false and notifies CRM.`,
+        `Deactivate ${userEmail || "this user"}? This sets isActive to false and notifies CRM.`,
     );
     if (!shouldDeactivate) {
         return;

@@ -51,7 +51,7 @@ function mapPersistedUser(rawUser) {
         email: normalizeRequiredString(rawUser.email, "email"),
         firstName: normalizeOptionalString(rawUser.firstName),
         lastName: normalizeOptionalString(rawUser.lastName),
-        gdprConsent: normalizeBoolean(rawUser.gdprConsent, "gdprConsent"),
+        isActive: normalizeBoolean(rawUser.isActive, "isActive"),
         companyId: normalizeOptionalString(rawUser.companyId),
     };
 }
@@ -61,7 +61,7 @@ function createUserRepository(pool) {
         const normalizedId = normalizeRequiredString(id, "id");
         const [rows] = await pool.query(
             `
-            SELECT id, email, firstName, lastName, gdprConsent, companyId
+            SELECT id, email, firstName, lastName, isActive, companyId
             FROM users
             WHERE id = ?
             LIMIT 1
@@ -80,7 +80,7 @@ function createUserRepository(pool) {
         const normalizedEmail = normalizeRequiredString(email, "email");
         const [rows] = await pool.query(
             `
-            SELECT id, email, firstName, lastName, gdprConsent, companyId
+            SELECT id, email, firstName, lastName, isActive, companyId
             FROM users
             WHERE email = ?
             LIMIT 1
@@ -139,13 +139,13 @@ function createUserRepository(pool) {
 
         await pool.query(
             `
-            INSERT INTO users (id, email, firstName, lastName, gdprConsent, companyId)
+            INSERT INTO users (id, email, firstName, lastName, isActive, companyId)
             VALUES (?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 email = VALUES(email),
                 firstName = VALUES(firstName),
                 lastName = VALUES(lastName),
-                gdprConsent = VALUES(gdprConsent),
+                isActive = VALUES(isActive),
                 companyId = VALUES(companyId),
                 updatedAt = CURRENT_TIMESTAMP
             `,
@@ -154,7 +154,7 @@ function createUserRepository(pool) {
                 user.email,
                 user.firstName,
                 user.lastName,
-                user.gdprConsent,
+                user.isActive,
                 user.companyId,
             ],
         );
@@ -169,7 +169,7 @@ function createUserRepository(pool) {
         const [result] = await pool.query(
             `
             UPDATE users
-            SET gdprConsent = FALSE, updatedAt = CURRENT_TIMESTAMP
+            SET isActive = FALSE, updatedAt = CURRENT_TIMESTAMP
             WHERE id = ? AND email = ?
             `,
             [normalizedId, normalizedEmail],
@@ -179,7 +179,7 @@ function createUserRepository(pool) {
             const [fallbackResult] = await pool.query(
                 `
                 UPDATE users
-                SET gdprConsent = FALSE, updatedAt = CURRENT_TIMESTAMP
+                SET isActive = FALSE, updatedAt = CURRENT_TIMESTAMP
                 WHERE email = ?
                 `,
                 [normalizedEmail],

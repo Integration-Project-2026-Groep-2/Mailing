@@ -40,7 +40,6 @@ const ALLOWED_FIELDS = new Set([
     "city",
     "country",
     "isActive",
-    "gdprConsent",
     "updatedAt",
 ]);
 
@@ -259,7 +258,6 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
             city: payload.city,
             country: payload.country,
             isActive: payload.isActive,
-            gdprConsent: payload.gdprConsent,
             updatedAt: payload.updatedAt,
         };
     }
@@ -313,16 +311,6 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
         ) {
             throw createValidationError(
                 "Invalid or missing isActive boolean value",
-            );
-        }
-
-        if (
-            !["true", "false", true, false, "1", "0", 1, 0].includes(
-                payload.gdprConsent,
-            )
-        ) {
-            throw createValidationError(
-                "Invalid or missing gdprConsent boolean value",
             );
         }
 
@@ -388,7 +376,7 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
             email: payload.email,
             firstName: payload.firstName,
             lastName: payload.lastName,
-            gdprConsent: payload.gdprConsent,
+            isActive: payload.isActive,
             companyId: payload.companyId,
         });
     }

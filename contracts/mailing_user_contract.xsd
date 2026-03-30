@@ -9,7 +9,7 @@
   - Scenario 2: mailing.user.updated
 
   This schema is intentionally aligned with the persisted user fields in Mailing DB:
-  id, email, firstName, lastName, gdprConsent, companyId.
+  id, email, firstName, lastName, isActive, companyId.
 
   No targetNamespace: queue XML payloads do not use namespace declarations.
 -->
@@ -40,7 +40,7 @@
 
   <!-- ============================================================
        CANONICAL PAYLOAD FOR Mailing -> CRM USER SYNC
-       Required: id, email, gdprConsent
+      Required: id, email, isActive
        Optional: firstName, lastName, companyId
   ============================================================ -->
 
@@ -50,7 +50,7 @@
       <xs:element name="email"       type="EmailType"/>
       <xs:element name="firstName"   type="xs:string" minOccurs="0" nillable="true"/>
       <xs:element name="lastName"    type="xs:string" minOccurs="0" nillable="true"/>
-      <xs:element name="gdprConsent" type="xs:boolean"/>
+      <xs:element name="isActive"    type="xs:boolean"/>
       <xs:element name="companyId"   type="UUIDType" minOccurs="0" nillable="true"/>
     </xs:sequence>
   </xs:complexType>

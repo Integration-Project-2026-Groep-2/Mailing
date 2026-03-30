@@ -57,7 +57,7 @@ function createSendgridService() {
                 first_name: user.firstName || "",
                 last_name: user.lastName || "",
                 company_id: user.companyId || "",
-                gdpr_consent: user.gdprConsent,
+                is_active: user.isActive,
                 confirmed_at: user.confirmedAt || "",
             },
         });
