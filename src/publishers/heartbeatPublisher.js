@@ -141,7 +141,7 @@ function createHeartbeatPublisher() {
     const serviceId = process.env.HEARTBEAT_SERVICE_ID || "mailing";
     const intervalMs = Number(process.env.HEARTBEAT_INTERVAL_MS || 30000);
     const exchange =
-        process.env.HEARTBEAT_EXCHANGE || "control_room_topic_exchange";
+        process.env.HEARTBEAT_EXCHANGE || "heartbeat.direct";
     const exchangeType = process.env.HEARTBEAT_EXCHANGE_TYPE || "topic";
     const routingKey = process.env.HEARTBEAT_ROUTING_KEY || "heartbeat.mailing";
     const rabbitUrl = buildRabbitUrlFromEnv();

@@ -44,7 +44,7 @@ Optional heartbeat variables:
 - `HEARTBEAT_ENABLED` (default: `true`)
 - `HEARTBEAT_SERVICE_ID` (default: `mailing`)
 - `HEARTBEAT_INTERVAL_MS` (default: `30000`)
-- `HEARTBEAT_EXCHANGE` (default: `control_room_topic_exchange`)
+- `HEARTBEAT_EXCHANGE` (default: `heartbeat.direct`)
 - `HEARTBEAT_EXCHANGE_TYPE` (default: `topic`)
 - `HEARTBEAT_ROUTING_KEY` (default: `heartbeat.mailing`)
 - `RABBITMQ_URL` (full AMQP URL override)
