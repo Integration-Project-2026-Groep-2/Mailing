@@ -9,40 +9,6 @@ const userContractPath = path.resolve(
     "../../contracts/user_data_contract.xsd",
 );
 
-const UUID_V4_REGEX =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const ISO_DATETIME_REGEX =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
-const COUNTRY_CODE_REGEX = /^[A-Z]{2}$/;
-const ALLOWED_ROLES = new Set([
-    "VISITOR",
-    "COMPANY_CONTACT",
-    "SPEAKER",
-    "EVENT_MANAGER",
-    "CASHIER",
-    "BAR_STAFF",
-    "ADMIN",
-]);
-
-const ALLOWED_FIELDS = new Set([
-    "id",
-    "email",
-    "firstName",
-    "lastName",
-    "phone",
-    "role",
-    "companyId",
-    "badgeCode",
-    "street",
-    "houseNumber",
-    "postalCode",
-    "city",
-    "country",
-    "isActive",
-    "updatedAt",
-]);
-
 function parseBoolean(value, defaultValue = true) {
     if (value === undefined || value === null || value === "") {
         return defaultValue;
@@ -93,6 +59,18 @@ function createValidationError(message) {
     const error = new Error(message);
     error.isValidationError = true;
     return error;
+}
+
+function buildMessageErrorContext(msg, queue, defaultRoutingKey) {
+    return {
+        queue,
+        routingKey: msg.fields?.routingKey || defaultRoutingKey,
+        exchange: msg.fields?.exchange,
+        deliveryTag: msg.fields?.deliveryTag,
+        redelivered: Boolean(msg.fields?.redelivered),
+        messageId: msg.properties?.messageId,
+        correlationId: msg.properties?.correlationId,
+    };
 }
 
 function validateWithXmllint(xml) {
@@ -233,16 +211,6 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
             );
         }
 
-        const unexpectedFields = Object.keys(payload).filter(
-            (fieldName) => !ALLOWED_FIELDS.has(fieldName),
-        );
-
-        if (unexpectedFields.length > 0) {
-            throw createValidationError(
-                `Unexpected fields in UserUpdated payload: ${unexpectedFields.join(", ")}`,
-            );
-        }
-
         return {
             id: payload.id,
             email: payload.email,
@@ -262,99 +230,12 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
         };
     }
 
-    function validateRequiredString(value, fieldName, maxLength = 255) {
-        const normalized = String(value || "").trim();
-        if (normalized.length === 0 || normalized.length > maxLength) {
-            throw createValidationError(
-                `Invalid or missing ${fieldName} (max length ${maxLength})`,
-            );
-        }
-
-        return normalized;
-    }
-
-    function validateOptionalString(value, fieldName, maxLength = 255) {
-        if (
-            value === undefined ||
-            value === null ||
-            String(value).trim() === ""
-        ) {
-            return null;
-        }
-
-        return validateRequiredString(value, fieldName, maxLength);
-    }
-
-    function validatePayload(payload) {
-        if (!UUID_V4_REGEX.test(String(payload.id || ""))) {
-            throw createValidationError(
-                "Invalid or missing id (UUID v4 required)",
-            );
-        }
-
-        const email = String(payload.email || "");
-        if (!EMAIL_REGEX.test(email) || email.length > 254) {
-            throw createValidationError("Invalid or missing email");
-        }
-
-        validateRequiredString(payload.firstName, "firstName", 80);
-        validateRequiredString(payload.lastName, "lastName", 80);
-
-        if (!ALLOWED_ROLES.has(String(payload.role || ""))) {
-            throw createValidationError("Invalid or missing role");
-        }
-
-        if (
-            !["true", "false", true, false, "1", "0", 1, 0].includes(
-                payload.isActive,
-            )
-        ) {
-            throw createValidationError(
-                "Invalid or missing isActive boolean value",
-            );
-        }
-
-        if (!ISO_DATETIME_REGEX.test(String(payload.updatedAt || ""))) {
-            throw createValidationError(
-                "Invalid or missing updatedAt ISO datetime",
-            );
-        }
-
-        if (
-            payload.companyId &&
-            !UUID_V4_REGEX.test(String(payload.companyId))
-        ) {
-            throw createValidationError("Invalid companyId (UUID v4 required)");
-        }
-
-        if (String(payload.role) === "COMPANY_CONTACT" && !payload.companyId) {
-            throw createValidationError(
-                "companyId is required when role is COMPANY_CONTACT",
-            );
-        }
-
-        validateOptionalString(payload.phone, "phone", 50);
-        validateOptionalString(payload.badgeCode, "badgeCode", 100);
-        validateOptionalString(payload.street, "street", 255);
-        validateOptionalString(payload.houseNumber, "houseNumber", 50);
-        validateOptionalString(payload.postalCode, "postalCode", 50);
-        validateOptionalString(payload.city, "city", 100);
-
-        const country = validateOptionalString(payload.country, "country", 2);
-        if (country && !COUNTRY_CODE_REGEX.test(country)) {
-            throw createValidationError(
-                "Invalid country code (expected 2 uppercase letters)",
-            );
-        }
-    }
-
     async function processMessage(msg) {
         const xmlContent = msg.content.toString("utf8");
 
         await validateWithXmllint(xmlContent);
 
         const payload = extractPayload(xmlContent);
-        validatePayload(payload);
 
         const existingByEmail = await userRepository.findUserByEmail(
             payload.email,
@@ -386,22 +267,27 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
             return;
         }
 
+        const errorContext = buildMessageErrorContext(msg, queue, routingKey);
+
         try {
             await processMessage(msg);
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error(
-                    `Rejecting invalid crm.user.updated payload: ${error.message}`,
-                );
+                console.error("Rejecting invalid crm.user.updated payload", {
+                    ...errorContext,
+                    errorMessage: error.message,
+                });
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error(
-                `Failed processing crm.user.updated payload (requeue=${shouldRequeue}): ${error.message}`,
-            );
+            console.error("Failed processing crm.user.updated payload", {
+                ...errorContext,
+                shouldRequeue,
+                errorMessage: error.message,
+            });
             channel.nack(msg, false, shouldRequeue);
         }
     }

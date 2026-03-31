@@ -41,6 +41,10 @@ createForm.addEventListener("submit", async (event) => {
         createStatusEl.textContent = `Created locally for ${createdUser.email}. CRM reconciliation is pending.`;
         createForm.reset();
     } catch (error) {
+        console.error("[ui.users] create failed", {
+            email: payload.email,
+            errorMessage: error.message,
+        });
         createStatusEl.textContent = `Failed to create user: ${error.message}`;
         createStatusEl.classList.add("error-state");
     }

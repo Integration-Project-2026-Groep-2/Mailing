@@ -99,6 +99,11 @@ async function deactivateUser(userId, userEmail) {
         statusEl.textContent = `User deactivated and CRM notified at ${new Date().toLocaleTimeString()}.`;
         await loadUsers();
     } catch (error) {
+        console.error("[ui.users] deactivate failed", {
+            userId,
+            userEmail,
+            errorMessage: error.message,
+        });
         statusEl.textContent = `Failed to deactivate user: ${error.message}`;
     }
 }
@@ -116,6 +121,9 @@ async function loadUsers() {
         setRows(users);
         statusEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
     } catch (error) {
+        console.error("[ui.users] list failed", {
+            errorMessage: error.message,
+        });
         usersBody.innerHTML = `<tr><td colspan="7" class="empty-state error-state">Failed to load users: ${escapeHtml(error.message)}</td></tr>`;
         statusEl.textContent = "Could not refresh users.";
     }

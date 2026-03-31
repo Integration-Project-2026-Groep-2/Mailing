@@ -181,11 +181,24 @@ function parseUpdateUserPayload(existingUser, body) {
     };
 }
 
+function logFlowError(flow, operation, error, context = {}) {
+    const errorMessage = error?.message || String(error);
+    console.error(`[${flow}] ${operation} failed`, {
+        ...context,
+        errorMessage,
+    });
+}
+
 function handleApiError(res, error, options = {}) {
     const {
         publishFailedStatus = 502,
         publishFailedMessage = "User was persisted but message publication failed",
+        flow = "api",
+        operation = "unknown",
+        context = {},
     } = options;
+
+    logFlowError(flow, operation, error, context);
 
     if (error?.isValidationError) {
         res.status(422).json({ error: error.message });
@@ -242,6 +255,7 @@ app.get("/health", async (_req, res) => {
             db: rows?.[0]?.ok === 1 ? "ok" : "unknown",
         });
     } catch (error) {
+        logFlowError("api.health", "health-check", error);
         res.status(503).json({
             service: "mailing-service",
             status: "degraded",
@@ -258,12 +272,16 @@ app.get("/users", async (_req, res) => {
         );
         res.status(200).json(rows);
     } catch (error) {
+        logFlowError("api.users", "list", error);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.post("/users", async (req, res) => {
     if (!userRepository) {
+        console.error("[api.users] create failed", {
+            reason: "user repository not initialized",
+        });
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -272,6 +290,10 @@ app.post("/users", async (req, res) => {
         const user = parseCreateUserPayload(req.body);
         const existing = await userRepository.findUserByEmail(user.email);
         if (existing) {
+            console.error("[api.users] create failed", {
+                reason: "email already exists",
+                email: user.email,
+            });
             res.status(409).json({
                 error: "User with this email already exists",
                 user: existing,
@@ -294,12 +316,22 @@ app.post("/users", async (req, res) => {
             syncStatus: "pending_crm_reconciliation",
         });
     } catch (error) {
-        handleApiError(res, error);
+        handleApiError(res, error, {
+            flow: "api.users",
+            operation: "create",
+            context: {
+                email: req.body?.email,
+            },
+        });
     }
 });
 
 app.put("/users/:id", async (req, res) => {
     if (!userRepository) {
+        console.error("[api.users] update failed", {
+            reason: "user repository not initialized",
+            id: req.params?.id,
+        });
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -308,6 +340,10 @@ app.put("/users/:id", async (req, res) => {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
         if (!existingUser) {
+            console.error("[api.users] update failed", {
+                reason: "user not found",
+                id: userId,
+            });
             res.status(404).json({ error: "User not found" });
             return;
         }
@@ -328,16 +364,31 @@ app.put("/users/:id", async (req, res) => {
         });
     } catch (error) {
         if (error?.isValidationError && error.message.includes("immutable")) {
+            logFlowError("api.users", "update", error, {
+                id: req.params?.id,
+                email: req.body?.email,
+            });
             res.status(409).json({ error: error.message });
             return;
         }
 
-        handleApiError(res, error);
+        handleApiError(res, error, {
+            flow: "api.users",
+            operation: "update",
+            context: {
+                id: req.params?.id,
+                email: req.body?.email,
+            },
+        });
     }
 });
 
 app.post("/users/:id/deactivate", async (req, res) => {
     if (!userRepository) {
+        console.error("[api.users] deactivate failed", {
+            reason: "user repository not initialized",
+            id: req.params?.id,
+        });
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -346,6 +397,10 @@ app.post("/users/:id/deactivate", async (req, res) => {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
         if (!existingUser) {
+            console.error("[api.users] deactivate failed", {
+                reason: "user not found",
+                id: userId,
+            });
             res.status(404).json({ error: "User not found" });
             return;
         }
@@ -377,8 +432,13 @@ app.post("/users/:id/deactivate", async (req, res) => {
         });
     } catch (error) {
         handleApiError(res, error, {
+            flow: "api.users",
+            operation: "deactivate",
             publishFailedMessage:
                 "User was deactivated locally but deactivation message publication failed",
+            context: {
+                id: req.params?.id,
+            },
         });
     }
 });

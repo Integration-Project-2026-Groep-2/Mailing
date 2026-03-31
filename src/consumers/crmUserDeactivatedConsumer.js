@@ -9,13 +9,6 @@ const userContractPath = path.resolve(
     "../../contracts/user_data_contract.xsd",
 );
 
-const UUID_V4_REGEX =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const ISO_DATETIME_REGEX =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
-const ALLOWED_FIELDS = new Set(["id", "email", "deactivatedAt"]);
-
 function parseBoolean(value, defaultValue = true) {
     if (value === undefined || value === null || value === "") {
         return defaultValue;
@@ -66,6 +59,18 @@ function createValidationError(message) {
     const error = new Error(message);
     error.isValidationError = true;
     return error;
+}
+
+function buildMessageErrorContext(msg, queue, defaultRoutingKey) {
+    return {
+        queue,
+        routingKey: msg.fields?.routingKey || defaultRoutingKey,
+        exchange: msg.fields?.exchange,
+        deliveryTag: msg.fields?.deliveryTag,
+        redelivered: Boolean(msg.fields?.redelivered),
+        messageId: msg.properties?.messageId,
+        correlationId: msg.properties?.correlationId,
+    };
 }
 
 function validateWithXmllint(xml) {
@@ -209,39 +214,11 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
             );
         }
 
-        const unexpectedFields = Object.keys(payload).filter(
-            (fieldName) => !ALLOWED_FIELDS.has(fieldName),
-        );
-        if (unexpectedFields.length > 0) {
-            throw createValidationError(
-                `Unexpected fields in UserDeactivated payload: ${unexpectedFields.join(", ")}`,
-            );
-        }
-
         return {
             id: payload.id,
             email: payload.email,
             deactivatedAt: payload.deactivatedAt,
         };
-    }
-
-    function validatePayload(payload) {
-        if (!UUID_V4_REGEX.test(String(payload.id || ""))) {
-            throw createValidationError(
-                "Invalid or missing id (UUID v4 required)",
-            );
-        }
-
-        const email = String(payload.email || "");
-        if (!EMAIL_REGEX.test(email) || email.length > 254) {
-            throw createValidationError("Invalid or missing email");
-        }
-
-        if (!ISO_DATETIME_REGEX.test(String(payload.deactivatedAt || ""))) {
-            throw createValidationError(
-                "Invalid or missing deactivatedAt ISO datetime",
-            );
-        }
     }
 
     async function processMessage(msg) {
@@ -250,7 +227,6 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
         await validateWithXmllint(xmlContent);
 
         const payload = extractPayload(xmlContent);
-        validatePayload(payload);
 
         const existingByEmail = await userRepository.findUserByEmail(
             payload.email,
@@ -284,22 +260,30 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
             return;
         }
 
+        const errorContext = buildMessageErrorContext(msg, queue, routingKey);
+
         try {
             await processMessage(msg);
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
                 console.error(
-                    `Rejecting invalid crm.user.deactivated payload: ${error.message}`,
+                    "Rejecting invalid crm.user.deactivated payload",
+                    {
+                        ...errorContext,
+                        errorMessage: error.message,
+                    },
                 );
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error(
-                `Failed processing crm.user.deactivated payload (requeue=${shouldRequeue}): ${error.message}`,
-            );
+            console.error("Failed processing crm.user.deactivated payload", {
+                ...errorContext,
+                shouldRequeue,
+                errorMessage: error.message,
+            });
             channel.nack(msg, false, shouldRequeue);
         }
     }

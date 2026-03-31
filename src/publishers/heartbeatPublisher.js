@@ -1,7 +1,6 @@
 const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
-const { XMLParser, XMLValidator } = require("fast-xml-parser");
 
 const heartbeatContractPath = path.resolve(
     __dirname,
@@ -50,51 +49,6 @@ function buildRabbitUrlFromEnv() {
     return `amqp://${user}:${password}@${host}:${port}/${normalizedVHost}`;
 }
 
-function validateIsoDateTime(value) {
-    if (typeof value !== "string") {
-        return false;
-    }
-
-    const xsDateTimeRegex =
-        /^-?\d{4,}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
-    if (!xsDateTimeRegex.test(value)) {
-        return false;
-    }
-
-    return !Number.isNaN(Date.parse(value));
-}
-
-function validateHeartbeatWithParser(xml) {
-    const xmlValidationResult = XMLValidator.validate(xml);
-    if (xmlValidationResult !== true) {
-        throw new Error(
-            `Heartbeat XML is malformed: ${xmlValidationResult.err.msg}`,
-        );
-    }
-
-    const parser = new XMLParser({
-        ignoreAttributes: false,
-        trimValues: true,
-        parseTagValue: false,
-    });
-    const payload = parser.parse(xml);
-
-    if (!payload || typeof payload !== "object" || !payload.Heartbeat) {
-        throw new Error("Heartbeat XML must contain a root Heartbeat element");
-    }
-
-    const heartbeat = payload.Heartbeat;
-    if (typeof heartbeat.serviceId !== "string") {
-        throw new Error("Heartbeat.serviceId must be an xs:string value");
-    }
-
-    if (!validateIsoDateTime(heartbeat.timestamp)) {
-        throw new Error(
-            "Heartbeat.timestamp must be a valid xs:dateTime value",
-        );
-    }
-}
-
 function validateHeartbeatWithXmllint(xml) {
     return new Promise((resolve, reject) => {
         const child = spawn(
@@ -111,7 +65,11 @@ function validateHeartbeatWithXmllint(xml) {
 
         child.on("error", (error) => {
             if (error.code === "ENOENT") {
-                resolve({ validated: false, reason: "xmllint-not-found" });
+                reject(
+                    new Error(
+                        "xmllint is required for Heartbeat XSD validation but was not found",
+                    ),
+                );
                 return;
             }
 
@@ -120,7 +78,7 @@ function validateHeartbeatWithXmllint(xml) {
 
         child.on("close", (code) => {
             if (code === 0) {
-                resolve({ validated: true });
+                resolve();
                 return;
             }
 
@@ -149,18 +107,9 @@ function createHeartbeatPublisher() {
     let channel;
     let timer;
     let isPublishing = false;
-    let warnedAboutXmllint = false;
 
     async function validateHeartbeatXml(xml) {
-        const xmllintResult = await validateHeartbeatWithXmllint(xml);
-        if (!xmllintResult.validated && !warnedAboutXmllint) {
-            warnedAboutXmllint = true;
-            console.warn(
-                "xmllint not found; using parser-based heartbeat validation fallback",
-            );
-        }
-
-        validateHeartbeatWithParser(xml);
+        await validateHeartbeatWithXmllint(xml);
     }
 
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
@@ -237,8 +186,6 @@ function createHeartbeatPublisher() {
                     "Heartbeat publish backpressure: broker buffer is full",
                 );
             }
-
-            console.log(`Heartbeat published for service '${serviceId}'`);
         } catch (error) {
             console.error(`Heartbeat publish failed: ${error.message}`);
         } finally {

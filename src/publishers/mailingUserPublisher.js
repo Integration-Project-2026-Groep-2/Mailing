@@ -34,79 +34,48 @@ function normalizeOptionalXmlString(value) {
     return normalized === "" ? null : normalized;
 }
 
-function normalizeRequiredXmlString(value, fieldName) {
-    const normalized = normalizeOptionalXmlString(value);
-    if (!normalized) {
-        throw new Error(`Missing required field: ${fieldName}`);
+function normalizeXmlString(value) {
+    if (value === undefined || value === null) {
+        return "";
     }
 
-    return normalized;
-}
-
-function normalizeBoolean(value, fieldName) {
-    if (typeof value === "boolean") {
-        return value;
-    }
-
-    if (typeof value === "number") {
-        if (value === 1) {
-            return true;
-        }
-
-        if (value === 0) {
-            return false;
-        }
-    }
-
-    if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (normalized === "true" || normalized === "1") {
-            return true;
-        }
-
-        if (normalized === "false" || normalized === "0") {
-            return false;
-        }
-    }
-
-    throw new Error(`Invalid boolean field: ${fieldName}`);
+    return String(value).trim();
 }
 
 function toMailingUserXml(rootElement, rawUser) {
     const user = {
-        id: normalizeRequiredXmlString(rawUser.id, "id"),
-        email: normalizeRequiredXmlString(rawUser.email, "email"),
+        id: normalizeXmlString(rawUser.id),
+        email: normalizeXmlString(rawUser.email),
         firstName: normalizeOptionalXmlString(rawUser.firstName),
         lastName: normalizeOptionalXmlString(rawUser.lastName),
-        isActive: normalizeBoolean(rawUser.isActive, "isActive"),
+        isActive: normalizeXmlString(rawUser.isActive),
         companyId: normalizeOptionalXmlString(rawUser.companyId),
     };
 
-    const optionalTags = [
+    const preIsActiveOptionalTags = [
         user.firstName !== null
             ? `<firstName>${escapeXml(user.firstName)}</firstName>`
             : "",
         user.lastName !== null
             ? `<lastName>${escapeXml(user.lastName)}</lastName>`
             : "",
-        user.companyId !== null
-            ? `<companyId>${escapeXml(user.companyId)}</companyId>`
-            : "",
     ]
         .filter(Boolean)
         .join("");
 
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<${rootElement}><id>${escapeXml(user.id)}</id><email>${escapeXml(user.email)}</email>${optionalTags}<isActive>${user.isActive}</isActive></${rootElement}>`;
+    const postIsActiveOptionalTags =
+        user.companyId !== null
+            ? `<companyId>${escapeXml(user.companyId)}</companyId>`
+            : "";
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<${rootElement}><id>${escapeXml(user.id)}</id><email>${escapeXml(user.email)}</email>${preIsActiveOptionalTags}<isActive>${user.isActive}</isActive>${postIsActiveOptionalTags}</${rootElement}>`;
 }
 
 function toMailingUserDeactivatedXml(rawUser) {
     const payload = {
-        id: normalizeRequiredXmlString(rawUser.id, "id"),
-        email: normalizeRequiredXmlString(rawUser.email, "email"),
-        deactivatedAt: normalizeRequiredXmlString(
-            rawUser.deactivatedAt,
-            "deactivatedAt",
-        ),
+        id: normalizeXmlString(rawUser.id),
+        email: normalizeXmlString(rawUser.email),
+        deactivatedAt: normalizeXmlString(rawUser.deactivatedAt),
     };
 
     return `<?xml version="1.0" encoding="UTF-8"?>\n<MailingUserDeactivated><id>${escapeXml(payload.id)}</id><email>${escapeXml(payload.email)}</email><deactivatedAt>${escapeXml(payload.deactivatedAt)}</deactivatedAt></MailingUserDeactivated>`;
