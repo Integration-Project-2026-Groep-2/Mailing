@@ -1,33 +1,13 @@
 const amqp = require("amqplib");
+const path = require("path");
+const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
 
-const UUID_V4_REGEX =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const ISO_DATETIME_REGEX =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
-const ALLOWED_ROLES = new Set([
-    "VISITOR",
-    "COMPANY_CONTACT",
-    "SPEAKER",
-    "EVENT_MANAGER",
-    "CASHIER",
-    "BAR_STAFF",
-    "ADMIN",
-]);
-const ALLOWED_USER_FIELDS = new Set([
-    "id",
-    "firstName",
-    "lastName",
-    "email",
-    "phone",
-    "companyId",
-    "role",
-    "badgeCode",
-    "isActive",
-    "confirmedAt",
-]);
+const userContractPath = path.resolve(
+    __dirname,
+    "../../contracts/user_data_contract.xsd",
+);
 
 function parseBoolean(value, defaultValue = true) {
     if (value === undefined || value === null || value === "") {
@@ -79,6 +59,63 @@ function createValidationError(message) {
     const error = new Error(message);
     error.isValidationError = true;
     return error;
+}
+
+function buildMessageErrorContext(msg, queue, defaultRoutingKey) {
+    return {
+        queue,
+        routingKey: msg.fields?.routingKey || defaultRoutingKey,
+        exchange: msg.fields?.exchange,
+        deliveryTag: msg.fields?.deliveryTag,
+        redelivered: Boolean(msg.fields?.redelivered),
+        messageId: msg.properties?.messageId,
+        correlationId: msg.properties?.correlationId,
+    };
+}
+
+function validateWithXmllint(xml) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(
+            "xmllint",
+            ["--noout", "--schema", userContractPath, "-"],
+            { stdio: ["pipe", "pipe", "pipe"] },
+        );
+
+        let stderr = "";
+
+        child.stderr.on("data", (data) => {
+            stderr += data.toString();
+        });
+
+        child.on("error", (error) => {
+            if (error.code === "ENOENT") {
+                reject(
+                    createValidationError(
+                        "xmllint is required for crm.user.confirmed XSD validation but was not found",
+                    ),
+                );
+                return;
+            }
+
+            reject(error);
+        });
+
+        child.on("close", (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(
+                createValidationError(
+                    `crm.user.confirmed XML failed XSD validation: ${stderr.trim() || "unknown xmllint error"}`,
+                ),
+            );
+        });
+
+        child.stdin.write(xml);
+        child.stdin.end();
+    });
 }
 
 function createCrmUserConfirmedConsumer({
@@ -174,17 +211,6 @@ function createCrmUserConfirmedConsumer({
             );
         }
 
-        const unexpectedFields = Object.keys(user).filter(
-            (fieldName) => !ALLOWED_USER_FIELDS.has(fieldName),
-        );
-        if (unexpectedFields.length > 0) {
-            throw createValidationError(
-                `Unexpected fields in UserConfirmed payload: ${unexpectedFields.join(
-                    ", ",
-                )}`,
-            );
-        }
-
         return {
             id: user.id,
             email: user.email,
@@ -197,72 +223,12 @@ function createCrmUserConfirmedConsumer({
         };
     }
 
-    function isValidOptionalIsoDate(value) {
-        if (value === undefined || value === null || value === "") {
-            return true;
-        }
-
-        return ISO_DATETIME_REGEX.test(String(value));
-    }
-
-    function validateUserContract(user) {
-        if (!UUID_V4_REGEX.test(String(user.id || ""))) {
-            throw createValidationError(
-                "Invalid or missing id (UUID v4 required)",
-            );
-        }
-
-        const email = String(user.email || "");
-        if (!EMAIL_REGEX.test(email) || email.length > 254) {
-            throw createValidationError("Invalid or missing email");
-        }
-
-        const firstName = String(user.firstName || "");
-        if (firstName.length === 0 || firstName.length > 80) {
-            throw createValidationError(
-                "Invalid or missing firstName (max length 80)",
-            );
-        }
-
-        const lastName = String(user.lastName || "");
-        if (lastName.length === 0 || lastName.length > 80) {
-            throw createValidationError(
-                "Invalid or missing lastName (max length 80)",
-            );
-        }
-
-        if (!ALLOWED_ROLES.has(String(user.role || ""))) {
-            throw createValidationError("Invalid or missing role");
-        }
-
-        if (!["true", "false", true, false, "1", "0"].includes(user.isActive)) {
-            throw createValidationError(
-                "Invalid or missing isActive boolean value",
-            );
-        }
-
-        if (!isValidOptionalIsoDate(user.confirmedAt)) {
-            throw createValidationError(
-                "Invalid or missing confirmedAt ISO datetime",
-            );
-        }
-
-        if (user.companyId && !UUID_V4_REGEX.test(String(user.companyId))) {
-            throw createValidationError("Invalid companyId (UUID v4 required)");
-        }
-
-        if (String(user.role) === "COMPANY_CONTACT" && !user.companyId) {
-            throw createValidationError(
-                "companyId is required when role is COMPANY_CONTACT",
-            );
-        }
-    }
-
     async function processMessage(msg) {
         const xmlContent = msg.content.toString("utf8");
 
+        await validateWithXmllint(xmlContent);
+
         const rawUser = extractUserFromXml(xmlContent);
-        validateUserContract(rawUser);
 
         const existingByEmail = await userRepository.findUserByEmail(
             rawUser.email,
@@ -306,30 +272,39 @@ function createCrmUserConfirmedConsumer({
             return;
         }
 
+        const errorContext = buildMessageErrorContext(msg, queue, routingKey);
+
         try {
             await processMessage(msg);
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error(
-                    `Rejecting invalid crm.user.confirmed payload: ${error.message}`,
-                );
+                console.error("Rejecting invalid crm.user.confirmed payload", {
+                    ...errorContext,
+                    errorMessage: error.message,
+                });
                 channel.nack(msg, false, false);
                 return;
             }
 
             if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) {
                 console.error(
-                    `Rejecting crm.user.confirmed payload due to duplicate key conflict: ${error.message}`,
+                    "Rejecting crm.user.confirmed payload due to duplicate key conflict",
+                    {
+                        ...errorContext,
+                        errorMessage: error.message,
+                    },
                 );
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error(
-                `Failed processing crm.user.confirmed payload (requeue=${shouldRequeue}): ${error.message}`,
-            );
+            console.error("Failed processing crm.user.confirmed payload", {
+                ...errorContext,
+                shouldRequeue,
+                errorMessage: error.message,
+            });
             channel.nack(msg, false, shouldRequeue);
         }
     }

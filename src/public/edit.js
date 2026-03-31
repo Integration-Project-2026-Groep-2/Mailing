@@ -63,6 +63,10 @@ async function loadUser() {
         editStatusEl.textContent = `Loaded user: ${escapeHtml(user.email)}`;
         editStatusEl.classList.remove("error-state");
     } catch (error) {
+        console.error("[ui.users] load failed", {
+            userId,
+            errorMessage: error.message,
+        });
         editStatusEl.textContent = `Failed to load user: ${error.message}`;
         editStatusEl.classList.add("error-state");
     }
@@ -116,6 +120,11 @@ editForm.addEventListener("submit", async (event) => {
         setField("companyId", updated.companyId || "");
         editStatusEl.textContent = "User updated and sync event published.";
     } catch (error) {
+        console.error("[ui.users] update failed", {
+            userId,
+            email: payload.email,
+            errorMessage: error.message,
+        });
         editStatusEl.textContent = `Failed to update user: ${error.message}`;
         editStatusEl.classList.add("error-state");
     }

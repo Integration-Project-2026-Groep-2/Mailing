@@ -1,18 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <UserUpdated>
-    <id>f47ac10b-58cc-4372-a567-0e02b2c3d479</id>
-    <email>alex.visitor@example.com</email>
-    <firstName>Alex</firstName>
-    <lastName>Visitor</lastName>
-    <phone>+32475123456</phone>
-    <role>VISITOR</role>
-    <companyId>3d594650-3436-4531-a916-4f5d6f70a6f2</companyId>
-    <badgeCode>BADGE-2026-0001</badgeCode>
-    <street>Stationsstraat</street>
-    <houseNumber>12A</houseNumber>
-    <postalCode>1000</postalCode>
-    <city>Brussel</city>
-    <country>BE</country>
+    <id>8a9b2a3e-6d1f-4b58-8c20-2f5f3f5c4d11</id>
+    <email>company.contact@gmail.com</email>
+    <firstName>New</firstName>
+    <lastName>Updated</lastName>
+    <phone>+32471234567</phone>
+    <role>COMPANY_CONTACT</role>
+    <companyId>9a33a76e-2c43-407b-8eee-48d141b2de80</companyId>
+    <badgeCode>BADGE-00123</badgeCode>
     <isActive>true</isActive>
-    <updatedAt>2026-03-28T14:30:00Z</updatedAt>
+    <gdprConsent>true</gdprConsent>
+    <updatedAt>2026-03-28T10:15:30+00:00</updatedAt>
 </UserUpdated>
