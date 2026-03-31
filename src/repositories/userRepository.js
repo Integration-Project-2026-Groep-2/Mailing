@@ -57,6 +57,14 @@ function mapPersistedUser(rawUser) {
 }
 
 function createUserRepository(pool) {
+    function resolveQueryExecutor(executor) {
+        if (executor && typeof executor.query === "function") {
+            return executor;
+        }
+
+        return pool;
+    }
+
     async function findUserById(id) {
         const normalizedId = normalizeRequiredString(id, "id");
         const [rows] = await pool.query(
@@ -191,8 +199,25 @@ function createUserRepository(pool) {
         return result.affectedRows;
     }
 
+    async function deleteUserByIdentity(rawUser, executor) {
+        const normalizedId = normalizeRequiredString(rawUser.id, "id");
+        const normalizedEmail = normalizeRequiredString(rawUser.email, "email");
+        const queryExecutor = resolveQueryExecutor(executor);
+
+        const [result] = await queryExecutor.query(
+            `
+            DELETE FROM users
+            WHERE id = ? AND email = ?
+            `,
+            [normalizedId, normalizedEmail],
+        );
+
+        return result.affectedRows;
+    }
+
     return {
         deactivateUserByIdentity,
+        deleteUserByIdentity,
         findUserById,
         findUserByEmail,
         replaceUserId,

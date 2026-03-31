@@ -122,6 +122,7 @@ docker compose -f compose.yml down -v
 - `POST /users`: persist user locally, then publish `mailing.user.created`
 - `PUT /users/:id`: persist update locally, then publish `mailing.user.updated` (email immutable)
 - `POST /users/:id/deactivate`: force `isActive=false` locally, then publish `mailing.user.deactivated`
+- `POST /users/:id/permanent-delete`: permanently delete user locally, then publish the same `mailing.user.deactivated` payload used by deactivate
 
 ## Heartbeat publishing
 
@@ -183,6 +184,14 @@ When the Deactivate action is used in the user list, the service executes:
 2. Publish `mailing.user.deactivated` to `user.topic`
 
 The outbound XML is validated against `contracts/mailing_user_contract.xsd` before publish. The message includes `id`, `email`, and `deactivatedAt`.
+
+When the Permanent Delete action is used in the user list, the service executes in a transaction:
+
+1. Delete the user row from MariaDB
+2. Publish the same `mailing.user.deactivated` payload to `user.topic`
+3. Commit only if publish succeeds
+
+If publish fails, the delete is rolled back and the API returns `502` with `persisted=false`.
 
 When Compose is running with default values:
 
