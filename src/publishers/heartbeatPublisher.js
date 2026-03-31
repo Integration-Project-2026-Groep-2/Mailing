@@ -100,7 +100,7 @@ function createHeartbeatPublisher() {
     const intervalMs = Number(process.env.HEARTBEAT_INTERVAL_MS || 30000);
     const exchange = process.env.HEARTBEAT_EXCHANGE || "heartbeat.direct";
     const exchangeType = process.env.HEARTBEAT_EXCHANGE_TYPE || "topic";
-    const routingKey = process.env.HEARTBEAT_ROUTING_KEY || "heartbeat.mailing";
+    const routingKey = process.env.HEARTBEAT_ROUTING_KEY || "routing.heartbeat";
     const rabbitUrl = buildRabbitUrlFromEnv();
 
     let connection;
