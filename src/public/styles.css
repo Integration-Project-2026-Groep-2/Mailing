@@ -126,6 +126,30 @@ th {
     color: var(--danger);
 }
 
+.button-danger-strong {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #ffffff;
+}
+
+.button-danger-strong:hover {
+    filter: brightness(0.94);
+}
+
+.button-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bin-icon {
+    width: 18px;
+    height: 18px;
+}
+
 .form {
     display: grid;
     gap: 12px;

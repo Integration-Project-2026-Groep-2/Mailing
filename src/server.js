@@ -193,6 +193,7 @@ function handleApiError(res, error, options = {}) {
     const {
         publishFailedStatus = 502,
         publishFailedMessage = "User was persisted but message publication failed",
+        publishFailedPersisted = true,
         flow = "api",
         operation = "unknown",
         context = {},
@@ -209,7 +210,7 @@ function handleApiError(res, error, options = {}) {
         res.status(publishFailedStatus).json({
             error: publishFailedMessage,
             details: error.message,
-            persisted: true,
+            persisted: publishFailedPersisted,
         });
         return;
     }
@@ -440,6 +441,98 @@ app.post("/users/:id/deactivate", async (req, res) => {
                 id: req.params?.id,
             },
         });
+    }
+});
+
+app.post("/users/:id/permanent-delete", async (req, res) => {
+    if (!userRepository) {
+        console.error("[api.users] permanent-delete failed", {
+            reason: "user repository not initialized",
+            id: req.params?.id,
+        });
+        res.status(503).json({ error: "User repository not initialized" });
+        return;
+    }
+
+    let connection;
+    let transactionStarted = false;
+
+    try {
+        const userId = normalizeRequiredUuid(req.params.id, "id");
+        const existingUser = await userRepository.findUserById(userId);
+        if (!existingUser) {
+            console.error("[api.users] permanent-delete failed", {
+                reason: "user not found",
+                id: userId,
+            });
+            res.status(404).json({ error: "User not found" });
+            return;
+        }
+
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        transactionStarted = true;
+
+        const deletedRows = await userRepository.deleteUserByIdentity(
+            {
+                id: existingUser.id,
+                email: existingUser.email,
+            },
+            connection,
+        );
+
+        if (deletedRows === 0) {
+            throw new Error("User delete failed: user identity no longer matches");
+        }
+
+        const deactivatedAt = new Date().toISOString();
+        try {
+            await mailingUserPublisher.publishUserDeactivated({
+                id: existingUser.id,
+                email: existingUser.email,
+                deactivatedAt,
+            });
+        } catch (error) {
+            error.code = "PUBLISH_FAILED";
+            throw error;
+        }
+
+        await connection.commit();
+        transactionStarted = false;
+
+        res.status(200).json({
+            status: "deleted_and_published",
+            user: existingUser,
+            deactivatedAt,
+        });
+    } catch (error) {
+        if (connection && transactionStarted) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                logFlowError(
+                    "api.users",
+                    "permanent-delete-rollback",
+                    rollbackError,
+                    { id: req.params?.id },
+                );
+            }
+        }
+
+        handleApiError(res, error, {
+            flow: "api.users",
+            operation: "permanent-delete",
+            publishFailedMessage:
+                "User deletion was rolled back because deactivation message publication failed",
+            publishFailedPersisted: false,
+            context: {
+                id: req.params?.id,
+            },
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 });
 

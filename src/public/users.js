@@ -56,6 +56,18 @@ function setRows(users) {
                             >
                                 Deactivate
                             </button>
+                            <button
+                                class="button button-danger button-danger-strong button-icon permanent-delete-user-btn"
+                                type="button"
+                                data-user-id="${id}"
+                                data-user-email="${escapeHtml(user.email)}"
+                                aria-label="Permanently delete user"
+                                title="Permanently delete user"
+                            >
+                                <svg class="bin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"/>
+                                </svg>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -108,6 +120,50 @@ async function deactivateUser(userId, userEmail) {
     }
 }
 
+async function permanentlyDeleteUser(userId, userEmail) {
+    if (!userId) {
+        return;
+    }
+
+    const shouldDelete = window.confirm(
+        `Permanently delete ${userEmail || "this user"}? This cannot be undone. The user will be removed from MariaDB and CRM will be notified with the same deactivation message.`,
+    );
+    if (!shouldDelete) {
+        return;
+    }
+
+    statusEl.textContent = "Permanently deleting user...";
+
+    try {
+        const response = await fetch(
+            `/users/${encodeURIComponent(userId)}/permanent-delete`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            },
+        );
+
+        const responseBody = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(
+                responseBody.error || `Request failed (${response.status})`,
+            );
+        }
+
+        statusEl.textContent = `User permanently deleted and CRM notified at ${new Date().toLocaleTimeString()}.`;
+        await loadUsers();
+    } catch (error) {
+        console.error("[ui.users] permanent delete failed", {
+            userId,
+            userEmail,
+            errorMessage: error.message,
+        });
+        statusEl.textContent = `Failed to permanently delete user: ${error.message}`;
+    }
+}
+
 async function loadUsers() {
     statusEl.textContent = "Loading users...";
 
@@ -135,17 +191,24 @@ refreshBtn.addEventListener("click", () => {
 
 usersBody.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) {
+    if (!(target instanceof Element)) {
         return;
     }
 
-    if (!target.classList.contains("deactivate-user-btn")) {
+    const deactivateButton = target.closest(".deactivate-user-btn");
+    if (deactivateButton instanceof HTMLElement) {
+        const userId = deactivateButton.dataset.userId;
+        const userEmail = deactivateButton.dataset.userEmail;
+        deactivateUser(userId, userEmail);
         return;
     }
 
-    const userId = target.dataset.userId;
-    const userEmail = target.dataset.userEmail;
-    deactivateUser(userId, userEmail);
+    const permanentDeleteButton = target.closest(".permanent-delete-user-btn");
+    if (permanentDeleteButton instanceof HTMLElement) {
+        const userId = permanentDeleteButton.dataset.userId;
+        const userEmail = permanentDeleteButton.dataset.userEmail;
+        permanentlyDeleteUser(userId, userEmail);
+    }
 });
 
 loadUsers();
