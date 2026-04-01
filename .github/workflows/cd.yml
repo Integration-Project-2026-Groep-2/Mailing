@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  SERVICE_NAME: mailing
+  SERVICE_NAME: mailing_app
   IMAGE: ghcr.io/integration-project-2026-groep-2/mailing
 
 jobs:
