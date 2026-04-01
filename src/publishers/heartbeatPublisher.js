@@ -97,7 +97,7 @@ function validateHeartbeatWithXmllint(xml) {
 function createHeartbeatPublisher() {
     const enabled = parseBoolean(process.env.HEARTBEAT_ENABLED, true);
     const serviceId = process.env.HEARTBEAT_SERVICE_ID || "mailing";
-    const intervalMs = Number(process.env.HEARTBEAT_INTERVAL_MS || 30000);
+    const intervalMs = Number(process.env.HEARTBEAT_INTERVAL_MS || 1000);
     const exchange = process.env.HEARTBEAT_EXCHANGE || "heartbeat.direct";
     const exchangeType = process.env.HEARTBEAT_EXCHANGE_TYPE || "topic";
     const routingKey = process.env.HEARTBEAT_ROUTING_KEY || "heartbeat.mailing";
