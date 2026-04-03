@@ -49,7 +49,7 @@ CREATE TABLE mail_logs (
     templateId VARCHAR(100),
     status ENUM('SENT', 'BOUNCED', 'FAILED'),
     sentAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (userId) REFERENCES users(id)
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 );
 ```
 
