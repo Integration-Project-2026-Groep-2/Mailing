@@ -50,7 +50,15 @@ let migrationService;
 const heartbeatPublisher = createHeartbeatPublisher();
 const mailingUserPublisher = createMailingUserPublisher();
 
-app.use(express.static(publicDir));
+app.use(
+    express.static(publicDir, {
+        etag: false,
+        maxAge: 0,
+        setHeaders(res) {
+            res.setHeader("Cache-Control", "no-store");
+        },
+    }),
+);
 app.use(express.json());
 
 function createValidationError(message) {
