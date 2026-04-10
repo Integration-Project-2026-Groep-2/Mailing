@@ -22,3 +22,30 @@ jobs:
 
             - name: Run tests
               run: npm run test:ci
+
+    integration:
+        runs-on: ubuntu-latest
+        env:
+            SENDGRID_ENABLED: "false"
+            RABBITMQ_AMQP_PORT: "5673"
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Use Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci --no-audit --no-fund
+
+            - name: Start integration stack
+              run: docker compose -f compose.yml -f compose.integration.yml up --build -d
+
+            - name: Run integration tests
+              run: npm run test:integration
+
+            - name: Stop integration stack
+              if: always()
+              run: docker compose -f compose.yml -f compose.integration.yml down -v

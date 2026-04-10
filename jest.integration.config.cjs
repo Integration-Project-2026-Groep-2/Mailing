@@ -3,6 +3,5 @@ module.exports = {
     clearMocks: true,
     restoreMocks: true,
     collectCoverage: false,
-    testMatch: ["**/test/**/*.test.js"],
-    testPathIgnorePatterns: ["/test/integration/"],
+    testMatch: ["**/test/integration/**/*.integration.test.js"],
 };

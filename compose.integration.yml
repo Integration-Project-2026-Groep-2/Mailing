@@ -1,0 +1,5 @@
+services:
+    app:
+        environment:
+            SENDGRID_ENABLED: "false"
+            RABBITMQ_URL: "amqp://devuser:devpass@rabbitmq:5672/%2F"
