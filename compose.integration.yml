@@ -2,4 +2,4 @@ services:
     app:
         environment:
             SENDGRID_ENABLED: "false"
-            RABBITMQ_URL: "amqp://devuser:devpass@rabbitmq:5672/%2F"
+            RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/%2F"
