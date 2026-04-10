@@ -3,6 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { processCrmUserDeactivatedUser } = require("../flows/crmUserFlows");
 
 const userContractPath = path.resolve(
     __dirname,
@@ -228,24 +229,8 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
 
         const payload = extractPayload(xmlContent);
 
-        const existingByEmail = await userRepository.findUserByEmail(
-            payload.email,
-        );
-        if (existingByEmail && existingByEmail.id !== payload.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                payload.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
-                    payload.id,
-                );
-            }
-        }
-
-        const affectedRows = await userRepository.deactivateUserByIdentity({
-            id: payload.id,
-            email: payload.email,
+        const affectedRows = await processCrmUserDeactivatedUser(payload, {
+            userRepository,
         });
 
         if (affectedRows === 0) {

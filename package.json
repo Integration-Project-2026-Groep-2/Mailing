@@ -6,7 +6,9 @@
     "scripts": {
         "start": "node src/server.js",
         "dev": "node --watch src/server.js",
-        "migrate:isactive": "node src/scripts/migrateGdprConsentToIsActive.js"
+        "migrate:isactive": "node src/scripts/migrateGdprConsentToIsActive.js",
+        "test": "jest",
+        "test:ci": "jest --runInBand"
     },
     "dependencies": {
         "@sendgrid/mail": "^8.1.6",
@@ -15,5 +17,8 @@
         "express": "^4.21.2",
         "fast-xml-parser": "^5.2.5",
         "mysql2": "^3.11.4"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0"
     }
 }
