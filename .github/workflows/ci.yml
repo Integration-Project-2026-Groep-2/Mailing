@@ -27,7 +27,7 @@ jobs:
         runs-on: ubuntu-latest
         env: # Integration testing environment variables, not to be confused with the ones in .env which are for production
             SENDGRID_ENABLED: "false"
-            RABBITMQ_AMQP_PORT: "5673"
+            INTEGRATION_RABBITMQ_AMQP_PORT: "5673"
             APP_PORT: "3000"
             DB_HOST: "db"
             DB_PORT: "3306"
@@ -66,7 +66,7 @@ jobs:
                   DB_EXPOSE_PORT=3308
                   RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
                   RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
-                  RABBITMQ_AMQP_PORT=${RABBITMQ_AMQP_PORT}
+                  INTEGRATION_RABBITMQ_AMQP_PORT=${INTEGRATION_RABBITMQ_AMQP_PORT}
                   RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT}
                   SENDGRID_API_KEY=${SENDGRID_API_KEY}
                   SENDGRID_USER_CONFIRMED_TEMPLATE_ID=${SENDGRID_USER_CONFIRMED_TEMPLATE_ID}

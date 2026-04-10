@@ -1,4 +1,8 @@
 services:
+    rabbitmq:
+        ports:
+            - "${INTEGRATION_RABBITMQ_AMQP_PORT:-5673}:5672"
+
     app:
         environment:
             SENDGRID_ENABLED: "false"
