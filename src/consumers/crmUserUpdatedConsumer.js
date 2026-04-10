@@ -3,6 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { processCrmUserUpdatedUser } = require("../flows/crmUserFlows");
 
 const userContractPath = path.resolve(
     __dirname,
@@ -237,28 +238,8 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
 
         const payload = extractPayload(xmlContent);
 
-        const existingByEmail = await userRepository.findUserByEmail(
-            payload.email,
-        );
-        if (existingByEmail && existingByEmail.id !== payload.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                payload.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
-                    payload.id,
-                );
-            }
-        }
-
-        await userRepository.upsertUser({
-            id: payload.id,
-            email: payload.email,
-            firstName: payload.firstName,
-            lastName: payload.lastName,
-            isActive: payload.isActive,
-            companyId: payload.companyId,
+        await processCrmUserUpdatedUser(payload, {
+            userRepository,
         });
     }
 

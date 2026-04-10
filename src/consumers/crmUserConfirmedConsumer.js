@@ -3,6 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { processCrmUserConfirmedUser } = require("../flows/crmUserFlows");
 
 const userContractPath = path.resolve(
     __dirname,
@@ -230,41 +231,11 @@ function createCrmUserConfirmedConsumer({
 
         const rawUser = extractUserFromXml(xmlContent);
 
-        const existingByEmail = await userRepository.findUserByEmail(
-            rawUser.email,
-        );
-        if (existingByEmail && existingByEmail.id !== rawUser.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                rawUser.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
-                    rawUser.id,
-                );
-            }
-        }
-
-        const persistedUser = await userRepository.upsertUser(rawUser);
-
-        try {
-            await sendgridService.sendUserConfirmedEmail({
-                ...persistedUser,
-                confirmedAt: rawUser.confirmedAt,
-            });
-            await mailLogRepository.insertMailLog({
-                userId: persistedUser.id,
-                templateId: sendgridService.confirmationTemplateId,
-                status: "SENT",
-            });
-        } catch (error) {
-            await mailLogRepository.insertMailLog({
-                userId: persistedUser.id,
-                templateId: sendgridService.confirmationTemplateId,
-                status: "FAILED",
-            });
-            throw error;
-        }
+        await processCrmUserConfirmedUser(rawUser, {
+            userRepository,
+            mailLogRepository,
+            sendgridService,
+        });
     }
 
     async function onMessage(msg) {
