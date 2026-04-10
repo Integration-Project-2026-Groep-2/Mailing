@@ -28,6 +28,13 @@ jobs:
         env: # Integration testing environment variables, not to be confused with the ones in .env which are for production
             SENDGRID_ENABLED: "false"
             INTEGRATION_RABBITMQ_AMQP_PORT: "5673"
+            INTEGRATION_APP_URL: "http://127.0.0.1:3000"
+            INTEGRATION_DB_HOST: "127.0.0.1"
+            INTEGRATION_DB_PORT: "3308"
+            INTEGRATION_DB_USER: "mailing_user"
+            INTEGRATION_DB_PASSWORD: "mailing_password"
+            INTEGRATION_DB_NAME: "mailing"
+            INTEGRATION_RABBITMQ_PORT: "5673"
             APP_PORT: "3000"
             DB_HOST: "db"
             DB_PORT: "3306"
@@ -38,6 +45,7 @@ jobs:
             RABBITMQ_DEFAULT_USER: "devuser"
             RABBITMQ_DEFAULT_PASS: "devpass"
             RABBITMQ_MANAGEMENT_PORT: "15672"
+            INTEGRATION_RABBITMQ_URL: "amqp://devuser:devpass@127.0.0.1:5673/%2F"
             SENDGRID_API_KEY: "SG.test-key"
             SENDGRID_USER_CONFIRMED_TEMPLATE_ID: "d-test-template"
             SENDGRID_FROM_EMAIL: "noreply@example.com"
@@ -55,7 +63,7 @@ jobs:
 
             - name: Create compose env file
               run: |
-                  cat > .env <<'EOF'
+                  cat > .env <<EOF
                   APP_PORT=${APP_PORT}
                   DB_HOST=${DB_HOST}
                   DB_PORT=${DB_PORT}
@@ -68,6 +76,14 @@ jobs:
                   RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
                   INTEGRATION_RABBITMQ_AMQP_PORT=${INTEGRATION_RABBITMQ_AMQP_PORT}
                   RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT}
+                  INTEGRATION_APP_URL=${INTEGRATION_APP_URL}
+                  INTEGRATION_RABBITMQ_URL=${INTEGRATION_RABBITMQ_URL}
+                  INTEGRATION_RABBITMQ_PORT=${INTEGRATION_RABBITMQ_PORT}
+                  INTEGRATION_DB_HOST=${INTEGRATION_DB_HOST}
+                  INTEGRATION_DB_PORT=${INTEGRATION_DB_PORT}
+                  INTEGRATION_DB_USER=${INTEGRATION_DB_USER}
+                  INTEGRATION_DB_PASSWORD=${INTEGRATION_DB_PASSWORD}
+                  INTEGRATION_DB_NAME=${INTEGRATION_DB_NAME}
                   SENDGRID_API_KEY=${SENDGRID_API_KEY}
                   SENDGRID_USER_CONFIRMED_TEMPLATE_ID=${SENDGRID_USER_CONFIRMED_TEMPLATE_ID}
                   SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
