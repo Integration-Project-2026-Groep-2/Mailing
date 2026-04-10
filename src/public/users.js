@@ -1,6 +1,7 @@
 const usersBody = document.getElementById("users-body");
 const statusEl = document.getElementById("status");
 const refreshBtn = document.getElementById("refresh-btn");
+const applyMigrationsBtn = document.getElementById("apply-migrations-btn");
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -185,9 +186,59 @@ async function loadUsers() {
     }
 }
 
+async function applyMigrations() {
+    if (!applyMigrationsBtn) {
+        return;
+    }
+
+    const shouldApply = window.confirm(
+        "Apply pending database migrations on this VM? This will update the live schema.",
+    );
+    if (!shouldApply) {
+        return;
+    }
+
+    applyMigrationsBtn.disabled = true;
+    statusEl.textContent = "Applying pending migrations...";
+
+    try {
+        const response = await fetch("/admin/migrations/apply", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+
+        const responseBody = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(
+                responseBody.error || `Request failed (${response.status})`,
+            );
+        }
+
+        const appliedCount = responseBody.applied?.length || 0;
+        const skippedCount = responseBody.skipped?.length || 0;
+        statusEl.textContent = `Migrations applied: ${appliedCount}, skipped: ${skippedCount}. Refreshing users...`;
+        await loadUsers();
+    } catch (error) {
+        console.error("[ui.users] migration apply failed", {
+            errorMessage: error.message,
+        });
+        statusEl.textContent = `Failed to apply migrations: ${error.message}`;
+    } finally {
+        applyMigrationsBtn.disabled = false;
+    }
+}
+
 refreshBtn.addEventListener("click", () => {
     loadUsers();
 });
+
+if (applyMigrationsBtn) {
+    applyMigrationsBtn.addEventListener("click", () => {
+        applyMigrations();
+    });
+}
 
 usersBody.addEventListener("click", (event) => {
     const target = event.target;

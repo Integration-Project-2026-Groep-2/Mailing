@@ -49,6 +49,84 @@ function buildRabbitUrlFromEnv() {
     return `amqp://${user}:${password}@${host}:${port}/${normalizedVHost}`;
 }
 
+function buildRabbitManagementBaseUrl() {
+    const host =
+        process.env.RABBITMQ_MANAGEMENT_HOST ||
+        process.env.RABBITMQ_HOST ||
+        "rabbitmq";
+    const port = Number(process.env.RABBITMQ_MANAGEMENT_PORT || 15672);
+
+    return `http://${host}:${port}`;
+}
+
+function buildRabbitManagementAuthHeader() {
+    const user = process.env.RABBITMQ_DEFAULT_USER || "guest";
+    const password = process.env.RABBITMQ_DEFAULT_PASS || "guest";
+    return `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
+}
+
+async function getRabbitExchangeMetadata(exchange, vhost = "/") {
+    const response = await fetch(
+        `${buildRabbitManagementBaseUrl()}/api/exchanges/${encodeURIComponent(vhost)}/${encodeURIComponent(exchange)}`,
+        {
+            headers: {
+                Authorization: buildRabbitManagementAuthHeader(),
+            },
+        },
+    );
+
+    if (response.status === 404) {
+        return null;
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            `RabbitMQ management API exchange lookup failed (${response.status})`,
+        );
+    }
+
+    return response.json();
+}
+
+async function deleteRabbitExchange(exchange, vhost = "/") {
+    const response = await fetch(
+        `${buildRabbitManagementBaseUrl()}/api/exchanges/${encodeURIComponent(vhost)}/${encodeURIComponent(exchange)}`,
+        {
+            method: "DELETE",
+            headers: {
+                Authorization: buildRabbitManagementAuthHeader(),
+            },
+        },
+    );
+
+    if (response.status === 204 || response.status === 404) {
+        return;
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            `RabbitMQ management API exchange delete failed (${response.status})`,
+        );
+    }
+}
+
+async function ensureRabbitExchangeType(exchange, exchangeType) {
+    const metadata = await getRabbitExchangeMetadata(exchange);
+
+    if (!metadata) {
+        return;
+    }
+
+    if (metadata.type === exchangeType) {
+        return;
+    }
+
+    console.warn(
+        `Heartbeat exchange '${exchange}' exists as '${metadata.type}', recreating as '${exchangeType}'.`,
+    );
+    await deleteRabbitExchange(exchange);
+}
+
 function validateHeartbeatWithXmllint(xml) {
     return new Promise((resolve, reject) => {
         const child = spawn(
@@ -115,8 +193,17 @@ function createHeartbeatPublisher() {
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
         for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
             try {
+                await ensureRabbitExchangeType(exchange, exchangeType);
+
                 connection = await amqp.connect(rabbitUrl);
                 channel = await connection.createChannel();
+
+                channel.on("error", (error) => {
+                    console.error(
+                        `RabbitMQ heartbeat channel error: ${error.message}`,
+                    );
+                });
+
                 await channel.assertExchange(exchange, exchangeType, {
                     durable: true,
                 });

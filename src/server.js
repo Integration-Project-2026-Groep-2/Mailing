@@ -18,6 +18,7 @@ const {
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
+const { createMigrationService } = require("./services/migrationService");
 
 require("dotenv").config({
     path: path.resolve(process.cwd(), ".env"),
@@ -44,6 +45,7 @@ let crmUserConfirmedConsumer;
 let crmUserDeactivatedConsumer;
 let crmUserUpdatedConsumer;
 let userRepository;
+let migrationService;
 
 const heartbeatPublisher = createHeartbeatPublisher();
 const mailingUserPublisher = createMailingUserPublisher();
@@ -278,6 +280,39 @@ app.get("/users", async (_req, res) => {
     }
 });
 
+app.get("/admin/migrations", async (_req, res) => {
+    if (!migrationService) {
+        res.status(503).json({ error: "Migration service not initialized" });
+        return;
+    }
+
+    try {
+        const migrations = await migrationService.listMigrations();
+        res.status(200).json({ migrations });
+    } catch (error) {
+        logFlowError("api.migrations", "list", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post("/admin/migrations/apply", async (_req, res) => {
+    if (!migrationService) {
+        res.status(503).json({ error: "Migration service not initialized" });
+        return;
+    }
+
+    try {
+        const result = await migrationService.applyPendingMigrations();
+        res.status(200).json({
+            status: "applied",
+            ...result,
+        });
+    } catch (error) {
+        logFlowError("api.migrations", "apply", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post("/users", async (req, res) => {
     if (!userRepository) {
         console.error("[api.users] create failed", {
@@ -482,7 +517,9 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
         );
 
         if (deletedRows === 0) {
-            throw new Error("User delete failed: user identity no longer matches");
+            throw new Error(
+                "User delete failed: user identity no longer matches",
+            );
         }
 
         const deactivatedAt = new Date().toISOString();
@@ -552,6 +589,7 @@ async function start() {
     await connectWithRetry();
 
     userRepository = createUserRepository(pool);
+    migrationService = createMigrationService(pool);
     const mailLogRepository = createMailLogRepository(pool);
     const sendgridService = createSendgridService();
     crmUserConfirmedConsumer = createCrmUserConfirmedConsumer({

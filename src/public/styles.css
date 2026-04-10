@@ -63,6 +63,13 @@ h1 {
     margin-bottom: 12px;
 }
 
+.toolbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .table-wrap {
     overflow-x: auto;
 }
@@ -185,5 +192,9 @@ select {
     .toolbar {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .toolbar-actions {
+        justify-content: flex-start;
     }
 }
