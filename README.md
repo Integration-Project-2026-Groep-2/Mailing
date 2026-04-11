@@ -115,6 +115,38 @@ Remove stack and DB volume:
 docker compose -f compose.yml down -v
 ```
 
+## Testing and CI/CD
+
+### Local test commands
+
+Run unit tests:
+
+```bash
+npm run test
+npm run test:ci       # single-threaded, for CI
+```
+
+Run integration tests (requires `docker compose up --build -d` first):
+
+```bash
+npm run test:integration
+```
+
+### CI workflow
+
+The `.github/workflows/ci.yml` workflow runs on pull requests and pushes to `main`:
+
+1. **Unit tests job**: Runs all Jest unit tests to verify isolated business logic.
+2. **Integration tests job**: Starts a Docker Compose stack with the app, RabbitMQ, and MariaDB, then validates:
+    - CRM message consumption (user confirmed, updated, deactivated)
+    - Outbound user event publishing
+    - XML/XSD validation
+    - End-to-end RabbitMQ message flows
+
+### Deployment gating
+
+A separate `.github/workflows/cd.yml` workflow deploys the app only after the CI workflow succeeds on `main`. This ensures all tests pass before any code reaches production.
+
 ## API endpoints
 
 - `GET /health`: service + database health check
