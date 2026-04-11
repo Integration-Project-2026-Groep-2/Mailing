@@ -79,16 +79,22 @@ function createSendgridService() {
     }
 
     async function sendInvoiceFinalizedEmail(invoice) {
+        const invoiceNumber = invoice.invoiceNumber || "";
+        const recipientEmail = invoice.recipientEmail || "";
+        const pdfUrl = invoice.pdfUrl || "";
+        const totalAmount = String(invoice.totalAmount ?? "");
+        const invoiceType = invoice.type || "";
+
         await sgMail.send({
-            to: invoice.recipientEmail,
+            to: recipientEmail,
             from: fromEmail,
             templateId: invoiceFinalizedTemplateId,
             dynamicTemplateData: {
-                invoice_number: invoice.invoiceNumber,
-                recipient_email: invoice.recipientEmail,
-                pdf_url: invoice.pdfUrl,
-                total_amount: String(invoice.totalAmount),
-                invoice_type: invoice.type,
+                invoiceNumber,
+                recipientEmail,
+                pdfUrl,
+                totalAmount,
+                type: invoiceType,
             },
         });
     }
