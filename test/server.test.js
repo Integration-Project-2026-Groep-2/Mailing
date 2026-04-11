@@ -34,6 +34,13 @@ jest.mock("../src/consumers/crmUserUpdatedConsumer", () => ({
     })),
 }));
 
+jest.mock("../src/consumers/invoiceFinalizedConsumer", () => ({
+    createInvoiceFinalizedConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
 jest.mock("../src/repositories/userRepository", () => ({
     createUserRepository: jest.fn(() => ({
         findUserByEmail: jest.fn(),
