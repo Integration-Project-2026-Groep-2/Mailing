@@ -146,6 +146,21 @@ async function getLatestMailLog(pool, userId) {
     return rows[0] || null;
 }
 
+async function getLatestMailLogByTemplate(pool, templateId) {
+    const [rows] = await pool.query(
+        `
+        SELECT id, userId, templateId, status, sentAt
+        FROM mail_logs
+        WHERE templateId = ?
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [templateId],
+    );
+
+    return rows[0] || null;
+}
+
 async function createTemporaryQueue(channel, exchange, routingKey) {
     const { queue } = await channel.assertQueue("", {
         exclusive: true,
@@ -219,6 +234,7 @@ module.exports = {
     createTemporaryQueue,
     deleteUserByEmail,
     getLatestMailLog,
+    getLatestMailLogByTemplate,
     getUserByEmail,
     parseXml,
     seedUser,

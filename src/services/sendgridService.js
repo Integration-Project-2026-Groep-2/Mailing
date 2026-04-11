@@ -13,14 +13,23 @@ function createSendgridService() {
     const apiKey = (process.env.SENDGRID_API_KEY || "").trim();
     const fromEmail = (process.env.SENDGRID_FROM_EMAIL || "").trim();
     const confirmationTemplateId = (
-        process.env.SENDGRID_USER_CONFIRMED_TEMPLATE_ID || ""
+        process.env.SENDGRID_USER_CONFIRMED_TEMPLATE_ID ||
+        "d-13e4548a8ebc4c19a738878b8d3bf9a8"
+    ).trim();
+    const invoiceFinalizedTemplateId = (
+        process.env.SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID ||
+        "d-6046aa6c0e3349fdb0df5bedf7dad483"
     ).trim();
 
     if (!enabled) {
         return {
             enabled,
             confirmationTemplateId,
+            invoiceFinalizedTemplateId,
             async sendUserConfirmedEmail() {
+                return;
+            },
+            async sendInvoiceFinalizedEmail() {
                 return;
             },
         };
@@ -44,6 +53,12 @@ function createSendgridService() {
         );
     }
 
+    if (!invoiceFinalizedTemplateId) {
+        throw new Error(
+            "SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID is required for invoice.finalized emails",
+        );
+    }
+
     sgMail.setApiKey(apiKey);
 
     async function sendUserConfirmedEmail(user) {
@@ -63,10 +78,27 @@ function createSendgridService() {
         });
     }
 
+    async function sendInvoiceFinalizedEmail(invoice) {
+        await sgMail.send({
+            to: invoice.recipientEmail,
+            from: fromEmail,
+            templateId: invoiceFinalizedTemplateId,
+            dynamicTemplateData: {
+                invoice_number: invoice.invoiceNumber,
+                recipient_email: invoice.recipientEmail,
+                pdf_url: invoice.pdfUrl,
+                total_amount: String(invoice.totalAmount),
+                invoice_type: invoice.type,
+            },
+        });
+    }
+
     return {
         enabled,
         confirmationTemplateId,
+        invoiceFinalizedTemplateId,
         sendUserConfirmedEmail,
+        sendInvoiceFinalizedEmail,
     };
 }
 
