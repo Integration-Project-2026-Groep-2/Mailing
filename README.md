@@ -63,6 +63,7 @@ Optional CRM user sync variables:
 - `SENDGRID_ENABLED` (default: `true`)
 - `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
 - `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
+- `SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID`
 
 Optional CRM user deactivated sync variables:
 
@@ -81,6 +82,15 @@ Optional CRM user updated sync variables:
 - `CRM_USER_UPDATED_QUEUE` (default: `mailing.user.updated`)
 - `CRM_USER_UPDATED_ROUTING_KEY` (default: `crm.user.updated`)
 - `CRM_USER_UPDATED_PREFETCH` (default: `10`)
+
+Optional invoice finalized sync variables:
+
+- `INVOICE_FINALIZED_SYNC_ENABLED` (default: `true`)
+- `INVOICE_FINALIZED_EXCHANGE` (default: `invoice.topic`)
+- `INVOICE_FINALIZED_EXCHANGE_TYPE` (default: `topic`)
+- `INVOICE_FINALIZED_QUEUE` (default: `mailing.invoice.finalized`)
+- `INVOICE_FINALIZED_ROUTING_KEY` (default: `invoice.finalized`)
+- `INVOICE_FINALIZED_PREFETCH` (default: `10`)
 
 Optional outbound Mailing user publish variables:
 
@@ -196,6 +206,18 @@ Sample payload for this flow is available at `tests/crm_user_deactivated_sample.
 The service consumes `crm.user.updated` from `contact.topic` and always validates the incoming XML against `contracts/user_data_contract.xsd` Contract 18 (`UserUpdated`).
 
 After XSD validation, the consumer applies strict payload checks and rejects unexpected fields. Valid messages are acknowledged and persisted through the existing `users` repository mapping (`id`, `email`, `firstName`, `lastName`, `isActive`, `companyId`).
+
+## Invoice finalized consumption
+
+The service consumes `invoice.finalized` from `invoice.topic` and validates payloads against `contracts/facturatie_contract.xsd`.
+
+For valid invoice messages:
+
+- Sends a SendGrid dynamic template email to `recipientEmail`
+- Uses template id from `SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID` (defaults to `d-6046aa6c0e3349fdb0df5bedf7dad483`)
+- Writes a `mail_logs` status row with `SENT` or `FAILED` (`userId = NULL`)
+
+Validation failures are rejected without requeue. Transient provider or infrastructure failures are nacked with requeue.
 
 ## Outbound create/update sync
 
