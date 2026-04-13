@@ -41,6 +41,13 @@ jest.mock("../src/consumers/invoiceFinalizedConsumer", () => ({
     })),
 }));
 
+jest.mock("../src/consumers/notifyAllUsersConsumer", () => ({
+    createNotifyAllUsersConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
 jest.mock("../src/repositories/userRepository", () => ({
     createUserRepository: jest.fn(() => ({
         findUserByEmail: jest.fn(),
@@ -56,7 +63,9 @@ jest.mock("../src/repositories/mailLogRepository", () => ({
 jest.mock("../src/services/sendgridService", () => ({
     createSendgridService: jest.fn(() => ({
         confirmationTemplateId: "template-confirmed",
+        notifyAllUsersTemplateId: "template-news",
         sendUserConfirmedEmail: jest.fn().mockResolvedValue(undefined),
+        sendNotifyAllUsersEmail: jest.fn().mockResolvedValue(undefined),
     })),
 }));
 

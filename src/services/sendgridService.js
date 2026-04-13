@@ -20,16 +20,24 @@ function createSendgridService() {
         process.env.SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID ||
         "d-6046aa6c0e3349fdb0df5bedf7dad483"
     ).trim();
+    const notifyAllUsersTemplateId = (
+        process.env.SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID ||
+        "d-115dc059ed754b38863f9c5ec06c07ea"
+    ).trim();
 
     if (!enabled) {
         return {
             enabled,
             confirmationTemplateId,
             invoiceFinalizedTemplateId,
+            notifyAllUsersTemplateId,
             async sendUserConfirmedEmail() {
                 return;
             },
             async sendInvoiceFinalizedEmail() {
+                return;
+            },
+            async sendNotifyAllUsersEmail() {
                 return;
             },
         };
@@ -56,6 +64,12 @@ function createSendgridService() {
     if (!invoiceFinalizedTemplateId) {
         throw new Error(
             "SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID is required for invoice.finalized emails",
+        );
+    }
+
+    if (!notifyAllUsersTemplateId) {
+        throw new Error(
+            "SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID is required for news.notify.all emails",
         );
     }
 
@@ -99,12 +113,27 @@ function createSendgridService() {
         });
     }
 
+    async function sendNotifyAllUsersEmail(update) {
+        await sgMail.send({
+            to: update.recipientEmail,
+            from: fromEmail,
+            templateId: notifyAllUsersTemplateId,
+            dynamicTemplateData: {
+                subjectLine: update.subjectLine || "",
+                updateType: update.updateType || "",
+                message: update.message || "",
+            },
+        });
+    }
+
     return {
         enabled,
         confirmationTemplateId,
         invoiceFinalizedTemplateId,
+        notifyAllUsersTemplateId,
         sendUserConfirmedEmail,
         sendInvoiceFinalizedEmail,
+        sendNotifyAllUsersEmail,
     };
 }
 

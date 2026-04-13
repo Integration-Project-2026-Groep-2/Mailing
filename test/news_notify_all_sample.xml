@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<notifyAllUsers>
+  <subjectLine>Platform Maintenance Notice</subjectLine>
+  <updateType>Maintenance</updateType>
+  <message>We will perform scheduled maintenance tonight between 22:00 and 23:00 CET.</message>
+</notifyAllUsers>

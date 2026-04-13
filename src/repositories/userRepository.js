@@ -103,6 +103,19 @@ function createUserRepository(pool) {
         return mapPersistedUser(rows[0]);
     }
 
+    async function findActiveUsers() {
+        const [rows] = await pool.query(
+            `
+            SELECT id, email, firstName, lastName, isActive, companyId
+            FROM users
+            WHERE isActive = TRUE
+            ORDER BY updatedAt DESC
+            `,
+        );
+
+        return rows.map(mapPersistedUser);
+    }
+
     async function replaceUserId(oldId, newId) {
         const normalizedOldId = normalizeRequiredString(oldId, "oldId");
         const normalizedNewId = normalizeRequiredString(newId, "newId");
@@ -218,6 +231,7 @@ function createUserRepository(pool) {
     return {
         deactivateUserByIdentity,
         deleteUserByIdentity,
+        findActiveUsers,
         findUserById,
         findUserByEmail,
         replaceUserId,
