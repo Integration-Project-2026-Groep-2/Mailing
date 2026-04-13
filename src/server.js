@@ -18,6 +18,9 @@ const {
 const {
     createInvoiceFinalizedConsumer,
 } = require("./consumers/invoiceFinalizedConsumer");
+const {
+    createNotifyAllUsersConsumer,
+} = require("./consumers/notifyAllUsersConsumer");
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
@@ -48,6 +51,7 @@ let crmUserConfirmedConsumer;
 let crmUserDeactivatedConsumer;
 let crmUserUpdatedConsumer;
 let invoiceFinalizedConsumer;
+let notifyAllUsersConsumer;
 let userRepository;
 let migrationService;
 
@@ -619,6 +623,11 @@ async function start() {
         mailLogRepository,
         sendgridService,
     });
+    notifyAllUsersConsumer = createNotifyAllUsersConsumer({
+        userRepository,
+        mailLogRepository,
+        sendgridService,
+    });
 
     await heartbeatPublisher.start();
     await mailingUserPublisher.start();
@@ -626,6 +635,7 @@ async function start() {
     await crmUserDeactivatedConsumer.start();
     await crmUserUpdatedConsumer.start();
     await invoiceFinalizedConsumer.start();
+    await notifyAllUsersConsumer.start();
 
     server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
@@ -664,6 +674,10 @@ async function shutdown(signal) {
 
     if (invoiceFinalizedConsumer) {
         await invoiceFinalizedConsumer.stop();
+    }
+
+    if (notifyAllUsersConsumer) {
+        await notifyAllUsersConsumer.stop();
     }
 
     if (pool) {

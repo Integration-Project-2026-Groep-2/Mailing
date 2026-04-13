@@ -64,6 +64,7 @@ Optional CRM user sync variables:
 - `SENDGRID_FROM_EMAIL` (required when `SENDGRID_ENABLED=true`)
 - `SENDGRID_USER_CONFIRMED_TEMPLATE_ID` (required for `crm.user.confirmed` flow)
 - `SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID`
+- `SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID`
 
 Optional CRM user deactivated sync variables:
 
@@ -91,6 +92,15 @@ Optional invoice finalized sync variables:
 - `INVOICE_FINALIZED_QUEUE` (default: `mailing.invoice.finalized`)
 - `INVOICE_FINALIZED_ROUTING_KEY` (default: `invoice.finalized`)
 - `INVOICE_FINALIZED_PREFETCH` (default: `10`)
+
+Optional news notify-all sync variables:
+
+- `NEWS_NOTIFY_ALL_SYNC_ENABLED` (default: `true`)
+- `NEWS_NOTIFY_ALL_EXCHANGE` (default: `news.topic`)
+- `NEWS_NOTIFY_ALL_EXCHANGE_TYPE` (default: `topic`)
+- `NEWS_NOTIFY_ALL_QUEUE` (default: `mailing.news.updates`)
+- `NEWS_NOTIFY_ALL_ROUTING_KEY` (default: `news.notify.all`)
+- `NEWS_NOTIFY_ALL_PREFETCH` (default: `10`)
 
 Optional outbound Mailing user publish variables:
 
@@ -216,6 +226,19 @@ For valid invoice messages:
 - Sends a SendGrid dynamic template email to `recipientEmail`
 - Uses template id from `SENDGRID_INVOICE_FINALIZED_TEMPLATE_ID` (defaults to `d-6046aa6c0e3349fdb0df5bedf7dad483`)
 - Writes a `mail_logs` status row with `SENT` or `FAILED` (`userId = NULL`)
+
+Validation failures are rejected without requeue. Transient provider or infrastructure failures are nacked with requeue.
+
+## News notify-all consumption
+
+The service consumes `news.notify.all` from `news.topic` and validates payloads against a dedicated broadcast contract.
+
+For valid messages:
+
+- Broadcasts one SendGrid email per active registered user
+- Uses template id from `SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID` (defaults to `NOTIFY_ALL_USERS_TEMPLATE`)
+- Sends template data using `subjectLine`, `updateType`, and `message`
+- Writes a `mail_logs` row per recipient with `SENT` or `FAILED`
 
 Validation failures are rejected without requeue. Transient provider or infrastructure failures are nacked with requeue.
 
