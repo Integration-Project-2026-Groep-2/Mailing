@@ -25,6 +25,7 @@ const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
 const { createMigrationService } = require("./services/migrationService");
+const { processNotifyAllUsers } = require("./flows/notifyAllUsersFlows");
 
 require("dotenv").config({
     path: path.resolve(process.cwd(), ".env"),
@@ -53,6 +54,8 @@ let crmUserUpdatedConsumer;
 let invoiceFinalizedConsumer;
 let notifyAllUsersConsumer;
 let userRepository;
+let mailLogRepository;
+let sendgridService;
 let migrationService;
 
 const heartbeatPublisher = createHeartbeatPublisher();
@@ -199,6 +202,19 @@ function parseUpdateUserPayload(existingUser, body) {
     };
 }
 
+function parseNotifyAllUsersPayload(body) {
+    const payload = body || {};
+
+    return {
+        subjectLine: normalizeRequiredString(
+            payload.subjectLine,
+            "subjectLine",
+        ),
+        updateType: normalizeRequiredString(payload.updateType, "updateType"),
+        message: normalizeRequiredString(payload.message, "message"),
+    };
+}
+
 function logFlowError(flow, operation, error, context = {}) {
     const errorMessage = error?.message || String(error);
     console.error(`[${flow}] ${operation} failed`, {
@@ -326,6 +342,40 @@ app.post("/admin/migrations/apply", async (_req, res) => {
     } catch (error) {
         logFlowError("api.migrations", "apply", error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.post("/admin/notify-all-users", async (req, res) => {
+    if (!userRepository || !mailLogRepository || !sendgridService) {
+        res.status(503).json({
+            error: "Broadcast dependencies not initialized",
+        });
+        return;
+    }
+
+    try {
+        const payload = parseNotifyAllUsersPayload(req.body);
+        const recipients = await userRepository.findActiveUsers();
+
+        await processNotifyAllUsers(payload, {
+            userRepository,
+            mailLogRepository,
+            sendgridService,
+        });
+
+        res.status(200).json({
+            status: "queued_and_sent",
+            recipients: recipients.length,
+        });
+    } catch (error) {
+        handleApiError(res, error, {
+            flow: "api.notify-all-users",
+            operation: "broadcast",
+            context: {
+                subjectLine: req.body?.subjectLine,
+                updateType: req.body?.updateType,
+            },
+        });
     }
 });
 
@@ -601,13 +651,17 @@ app.get("/users/:id/edit", (_req, res) => {
     res.sendFile(path.join(publicDir, "edit.html"));
 });
 
+app.get("/notify-all-users", (_req, res) => {
+    res.sendFile(path.join(publicDir, "notify-all-users.html"));
+});
+
 async function start() {
     await connectWithRetry();
 
     userRepository = createUserRepository(pool);
+    mailLogRepository = createMailLogRepository(pool);
+    sendgridService = createSendgridService();
     migrationService = createMigrationService(pool);
-    const mailLogRepository = createMailLogRepository(pool);
-    const sendgridService = createSendgridService();
     crmUserConfirmedConsumer = createCrmUserConfirmedConsumer({
         userRepository,
         mailLogRepository,

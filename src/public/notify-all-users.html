@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-mail All Users - Mailing Service</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page page-narrow">
+      <header class="page-header">
+        <div>
+          <h1>E-mail All Users</h1>
+          <p class="subtitle">
+            Send one update to all active registered users through this service.
+          </p>
+        </div>
+        <a class="button button-secondary" href="/">Back to users</a>
+      </header>
+
+      <section class="card">
+        <form id="notify-form" class="form">
+          <label for="subjectLine">
+            Subject line
+            <input
+              id="subjectLine"
+              name="subjectLine"
+              type="text"
+              required
+              maxlength="200"
+            />
+          </label>
+
+          <label for="updateType">
+            Update type
+            <input
+              id="updateType"
+              name="updateType"
+              type="text"
+              required
+              maxlength="100"
+            />
+          </label>
+
+          <label for="message">
+            Message
+            <textarea
+              id="message"
+              name="message"
+              rows="8"
+              required
+              maxlength="10000"
+            ></textarea>
+          </label>
+
+          <div class="form-actions">
+            <button id="send-btn" class="button button-primary" type="submit">
+              E-mail all users
+            </button>
+          </div>
+        </form>
+
+        <p id="notify-status" class="subtitle" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="/notify-all-users.js?v=20260413-1"></script>
+  </body>
+</html>
