@@ -48,6 +48,13 @@ jest.mock("../src/consumers/notifyAllUsersConsumer", () => ({
     })),
 }));
 
+jest.mock("../src/consumers/newsNotifySessionConsumer", () => ({
+    createNewsNotifySessionConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
 jest.mock("../src/consumers/planningSessionUpdatedConsumer", () => ({
     createPlanningSessionUpdatedConsumer: jest.fn(() => ({
         start: jest.fn().mockResolvedValue(undefined),
@@ -85,8 +92,10 @@ jest.mock("../src/services/sendgridService", () => ({
     createSendgridService: jest.fn(() => ({
         confirmationTemplateId: "template-confirmed",
         notifyAllUsersTemplateId: "template-news",
+        notifySessionTemplateId: "template-session-news",
         sendUserConfirmedEmail: jest.fn().mockResolvedValue(undefined),
         sendNotifyAllUsersEmail: jest.fn().mockResolvedValue(undefined),
+        sendNotifySessionEmail: jest.fn().mockResolvedValue(undefined),
     })),
 }));
 

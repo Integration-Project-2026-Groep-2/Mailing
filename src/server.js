@@ -22,6 +22,9 @@ const {
     createNotifyAllUsersConsumer,
 } = require("./consumers/notifyAllUsersConsumer");
 const {
+    createNewsNotifySessionConsumer,
+} = require("./consumers/newsNotifySessionConsumer");
+const {
     createPlanningSessionUpdatedConsumer,
 } = require("./consumers/planningSessionUpdatedConsumer");
 const {
@@ -62,6 +65,7 @@ let crmUserDeactivatedConsumer;
 let crmUserUpdatedConsumer;
 let invoiceFinalizedConsumer;
 let notifyAllUsersConsumer;
+let newsNotifySessionConsumer;
 let planningSessionUpdatedConsumer;
 let planningSessionCancelledConsumer;
 let planningSessionRescheduledConsumer;
@@ -694,6 +698,11 @@ async function start() {
         mailLogRepository,
         sendgridService,
     });
+    newsNotifySessionConsumer = createNewsNotifySessionConsumer({
+        userRepository,
+        mailLogRepository,
+        sendgridService,
+    });
     planningSessionUpdatedConsumer = createPlanningSessionUpdatedConsumer({
         userRepository,
         mailLogRepository,
@@ -718,6 +727,7 @@ async function start() {
     await crmUserUpdatedConsumer.start();
     await invoiceFinalizedConsumer.start();
     await notifyAllUsersConsumer.start();
+    await newsNotifySessionConsumer.start();
     await planningSessionUpdatedConsumer.start();
     await planningSessionCancelledConsumer.start();
     await planningSessionRescheduledConsumer.start();
@@ -763,6 +773,10 @@ async function shutdown(signal) {
 
     if (notifyAllUsersConsumer) {
         await notifyAllUsersConsumer.stop();
+    }
+
+    if (newsNotifySessionConsumer) {
+        await newsNotifySessionConsumer.stop();
     }
 
     if (planningSessionUpdatedConsumer) {

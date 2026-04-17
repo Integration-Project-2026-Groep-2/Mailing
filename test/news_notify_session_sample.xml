@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NotifySession>
+  <sessionId>f9eb6409-e9e7-4f0c-af9b-cf76aee4c8e8</sessionId>
+  <sessionName>Advanced Integration Workshop</sessionName>
+  <participantIds>
+    <participantId>205cc215-0407-4651-8e2c-ab3d495d8bb2</participantId>
+    <participantId>f301ced0-7c43-44f5-9f4d-fcb20af5e67c</participantId>
+  </participantIds>
+  <subjectLine>Important update for your workshop session</subjectLine>
+  <message>The room has changed to Hall C. Please arrive 10 minutes early.</message>
+</NotifySession>
