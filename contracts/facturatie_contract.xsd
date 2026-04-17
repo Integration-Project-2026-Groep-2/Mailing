@@ -14,7 +14,7 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <xs:element name="invoice_finalized">
+  <xs:element name="InvoiceFinalized">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="invoiceNumber" type="xs:string"/>

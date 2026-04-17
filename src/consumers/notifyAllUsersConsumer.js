@@ -209,10 +209,10 @@ function createNotifyAllUsersConsumer({
             );
         }
 
-        const payload = parsed?.notifyAllUsers;
+        const payload = parsed?.NotifyAllUsers;
         if (!payload || typeof payload !== "object") {
             throw createValidationError(
-                "Expected root <notifyAllUsers> element in payload",
+                "Expected root <NotifyAllUsers> element in payload",
             );
         }
 

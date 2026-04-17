@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<invoice_finalized>
+<InvoiceFinalized>
   <invoiceNumber>INV-2026-0001</invoiceNumber>
-  <recipientEmail>finance@example.com</recipientEmail>
+  <recipientEmail>lucas.leonte@student.ehb.be</recipientEmail>
   <pdfUrl>https://example.com/invoices/INV-2026-0001.pdf</pdfUrl>
   <totalAmount>149.95</totalAmount>
   <type>REGULAR</type>
-</invoice_finalized>
+</InvoiceFinalized>
