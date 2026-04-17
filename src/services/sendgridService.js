@@ -24,6 +24,18 @@ function createSendgridService() {
         process.env.SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID ||
         "d-115dc059ed754b38863f9c5ec06c07ea"
     ).trim();
+    const sessionUpdatedTemplateId = (
+        process.env.SENDGRID_SESSION_UPDATED_TEMPLATE_ID ||
+        "d-2b8f72c6d9544f36a40753951139878b"
+    ).trim();
+    const sessionCanceledTemplateId = (
+        process.env.SENDGRID_SESSION_CANCELED_TEMPLATE_ID ||
+        "d-99bfd7db77404490bca95f70005a5f4c"
+    ).trim();
+    const sessionRescheduledTemplateId = (
+        process.env.SENDGRID_SESSION_RESCHEDULED_TEMPLATE_ID ||
+        "d-33ced75f5e0342d4b8a2b3f573eec23a"
+    ).trim();
 
     if (!enabled) {
         return {
@@ -31,6 +43,9 @@ function createSendgridService() {
             confirmationTemplateId,
             invoiceFinalizedTemplateId,
             notifyAllUsersTemplateId,
+            sessionUpdatedTemplateId,
+            sessionCanceledTemplateId,
+            sessionRescheduledTemplateId,
             async sendUserConfirmedEmail() {
                 return;
             },
@@ -38,6 +53,15 @@ function createSendgridService() {
                 return;
             },
             async sendNotifyAllUsersEmail() {
+                return;
+            },
+            async sendSessionUpdatedEmail() {
+                return;
+            },
+            async sendSessionCanceledEmail() {
+                return;
+            },
+            async sendSessionRescheduledEmail() {
                 return;
             },
         };
@@ -70,6 +94,24 @@ function createSendgridService() {
     if (!notifyAllUsersTemplateId) {
         throw new Error(
             "SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID is required for news.notify.all emails",
+        );
+    }
+
+    if (!sessionUpdatedTemplateId) {
+        throw new Error(
+            "SENDGRID_SESSION_UPDATED_TEMPLATE_ID is required for planning.session.updated emails",
+        );
+    }
+
+    if (!sessionCanceledTemplateId) {
+        throw new Error(
+            "SENDGRID_SESSION_CANCELED_TEMPLATE_ID is required for planning.session.cancelled emails",
+        );
+    }
+
+    if (!sessionRescheduledTemplateId) {
+        throw new Error(
+            "SENDGRID_SESSION_RESCHEDULED_TEMPLATE_ID is required for planning.session.rescheduled emails",
         );
     }
 
@@ -126,14 +168,70 @@ function createSendgridService() {
         });
     }
 
+    async function sendSessionUpdatedEmail(payload) {
+        await sgMail.send({
+            to: payload.recipientEmail,
+            from: fromEmail,
+            templateId: sessionUpdatedTemplateId,
+            dynamicTemplateData: {
+                sessionId: payload.sessionId || "",
+                sessionName: payload.sessionName || "",
+                changeType: payload.changeType || "",
+                newTime: payload.newTime || "",
+                newLocation: payload.newLocation || "",
+                timestamp: payload.timestamp || "",
+            },
+        });
+    }
+
+    async function sendSessionCanceledEmail(payload) {
+        await sgMail.send({
+            to: payload.recipientEmail,
+            from: fromEmail,
+            templateId: sessionCanceledTemplateId,
+            dynamicTemplateData: {
+                sessionId: payload.sessionId || "",
+                status: payload.status || "",
+                reason: payload.reason || "",
+                timestamp: payload.timestamp || "",
+            },
+        });
+    }
+
+    async function sendSessionRescheduledEmail(payload) {
+        await sgMail.send({
+            to: payload.recipientEmail,
+            from: fromEmail,
+            templateId: sessionRescheduledTemplateId,
+            dynamicTemplateData: {
+                sessionId: payload.sessionId || "",
+                oldDate: payload.oldDate || "",
+                oldStartTime: payload.oldStartTime || "",
+                oldEndTime: payload.oldEndTime || "",
+                newDate: payload.newDate || "",
+                newStartTime: payload.newStartTime || "",
+                newEndTime: payload.newEndTime || "",
+                newLocation: payload.newLocation || "",
+                reason: payload.reason || "",
+                timestamp: payload.timestamp || "",
+            },
+        });
+    }
+
     return {
         enabled,
         confirmationTemplateId,
         invoiceFinalizedTemplateId,
         notifyAllUsersTemplateId,
+        sessionUpdatedTemplateId,
+        sessionCanceledTemplateId,
+        sessionRescheduledTemplateId,
         sendUserConfirmedEmail,
         sendInvoiceFinalizedEmail,
         sendNotifyAllUsersEmail,
+        sendSessionUpdatedEmail,
+        sendSessionCanceledEmail,
+        sendSessionRescheduledEmail,
     };
 }
 

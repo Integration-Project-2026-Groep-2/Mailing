@@ -21,6 +21,15 @@ const {
 const {
     createNotifyAllUsersConsumer,
 } = require("./consumers/notifyAllUsersConsumer");
+const {
+    createPlanningSessionUpdatedConsumer,
+} = require("./consumers/planningSessionUpdatedConsumer");
+const {
+    createPlanningSessionCancelledConsumer,
+} = require("./consumers/planningSessionCancelledConsumer");
+const {
+    createPlanningSessionRescheduledConsumer,
+} = require("./consumers/planningSessionRescheduledConsumer");
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
@@ -53,6 +62,9 @@ let crmUserDeactivatedConsumer;
 let crmUserUpdatedConsumer;
 let invoiceFinalizedConsumer;
 let notifyAllUsersConsumer;
+let planningSessionUpdatedConsumer;
+let planningSessionCancelledConsumer;
+let planningSessionRescheduledConsumer;
 let userRepository;
 let mailLogRepository;
 let sendgridService;
@@ -682,6 +694,22 @@ async function start() {
         mailLogRepository,
         sendgridService,
     });
+    planningSessionUpdatedConsumer = createPlanningSessionUpdatedConsumer({
+        userRepository,
+        mailLogRepository,
+        sendgridService,
+    });
+    planningSessionCancelledConsumer = createPlanningSessionCancelledConsumer({
+        userRepository,
+        mailLogRepository,
+        sendgridService,
+    });
+    planningSessionRescheduledConsumer =
+        createPlanningSessionRescheduledConsumer({
+            userRepository,
+            mailLogRepository,
+            sendgridService,
+        });
 
     await heartbeatPublisher.start();
     await mailingUserPublisher.start();
@@ -690,6 +718,9 @@ async function start() {
     await crmUserUpdatedConsumer.start();
     await invoiceFinalizedConsumer.start();
     await notifyAllUsersConsumer.start();
+    await planningSessionUpdatedConsumer.start();
+    await planningSessionCancelledConsumer.start();
+    await planningSessionRescheduledConsumer.start();
 
     server = app.listen(port, () => {
         console.log(`Mailing service listening on port ${port}`);
@@ -732,6 +763,18 @@ async function shutdown(signal) {
 
     if (notifyAllUsersConsumer) {
         await notifyAllUsersConsumer.stop();
+    }
+
+    if (planningSessionUpdatedConsumer) {
+        await planningSessionUpdatedConsumer.stop();
+    }
+
+    if (planningSessionCancelledConsumer) {
+        await planningSessionCancelledConsumer.stop();
+    }
+
+    if (planningSessionRescheduledConsumer) {
+        await planningSessionRescheduledConsumer.stop();
     }
 
     if (pool) {
