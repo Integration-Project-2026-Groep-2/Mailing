@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SessionRescheduled>
+  <sessionId>6bb80446-a8f2-4a27-8cc2-f8395db67187</sessionId>
+  <oldDate>2026-05-12</oldDate>
+  <oldStartTime>13:00:00</oldStartTime>
+  <oldEndTime>14:30:00</oldEndTime>
+  <newDate>2026-05-13</newDate>
+  <newStartTime>09:30:00</newStartTime>
+  <newEndTime>11:00:00</newEndTime>
+  <newLocation>Workshop Room B</newLocation>
+  <reason>Room conflict</reason>
+  <participantIds>
+    <participantId>205cc215-0407-4651-8e2c-ab3d495d8bb2</participantId>
+    <participantId>f301ced0-7c43-44f5-9f4d-fcb20af5e67c</participantId>
+  </participantIds>
+  <timestamp>2026-05-02T08:15:00Z</timestamp>
+</SessionRescheduled>

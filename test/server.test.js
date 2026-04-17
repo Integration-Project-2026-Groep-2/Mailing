@@ -48,6 +48,27 @@ jest.mock("../src/consumers/notifyAllUsersConsumer", () => ({
     })),
 }));
 
+jest.mock("../src/consumers/planningSessionUpdatedConsumer", () => ({
+    createPlanningSessionUpdatedConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
+jest.mock("../src/consumers/planningSessionCancelledConsumer", () => ({
+    createPlanningSessionCancelledConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
+jest.mock("../src/consumers/planningSessionRescheduledConsumer", () => ({
+    createPlanningSessionRescheduledConsumer: jest.fn(() => ({
+        start: jest.fn().mockResolvedValue(undefined),
+        stop: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
 jest.mock("../src/repositories/userRepository", () => ({
     createUserRepository: jest.fn(() => ({
         findUserByEmail: jest.fn(),

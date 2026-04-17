@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SessionCancelled>
+  <sessionId>b4f9799f-3895-4173-b694-f2e44a20cdf6</sessionId>
+  <status>cancelled</status>
+  <reason>Speaker unavailable due to travel disruption</reason>
+  <participantIds>
+    <participantId>205cc215-0407-4651-8e2c-ab3d495d8bb2</participantId>
+    <participantId>f301ced0-7c43-44f5-9f4d-fcb20af5e67c</participantId>
+  </participantIds>
+  <timestamp>2026-05-01T11:45:00Z</timestamp>
+</SessionCancelled>
