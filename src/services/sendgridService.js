@@ -24,6 +24,10 @@ function createSendgridService() {
         process.env.SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID ||
         "d-115dc059ed754b38863f9c5ec06c07ea"
     ).trim();
+    const notifySessionTemplateId = (
+        process.env.SENDGRID_NOTIFY_SESSION_TEMPLATE_ID ||
+        "d-776ded87e0a04501ad73b57088f0fd7b"
+    ).trim();
     const sessionUpdatedTemplateId = (
         process.env.SENDGRID_SESSION_UPDATED_TEMPLATE_ID ||
         "d-2b8f72c6d9544f36a40753951139878b"
@@ -43,6 +47,7 @@ function createSendgridService() {
             confirmationTemplateId,
             invoiceFinalizedTemplateId,
             notifyAllUsersTemplateId,
+            notifySessionTemplateId,
             sessionUpdatedTemplateId,
             sessionCanceledTemplateId,
             sessionRescheduledTemplateId,
@@ -53,6 +58,9 @@ function createSendgridService() {
                 return;
             },
             async sendNotifyAllUsersEmail() {
+                return;
+            },
+            async sendNotifySessionEmail() {
                 return;
             },
             async sendSessionUpdatedEmail() {
@@ -94,6 +102,12 @@ function createSendgridService() {
     if (!notifyAllUsersTemplateId) {
         throw new Error(
             "SENDGRID_NOTIFY_ALL_USERS_TEMPLATE_ID is required for news.notify.all emails",
+        );
+    }
+
+    if (!notifySessionTemplateId) {
+        throw new Error(
+            "SENDGRID_NOTIFY_SESSION_TEMPLATE_ID is required for news.notify.session emails",
         );
     }
 
@@ -168,6 +182,20 @@ function createSendgridService() {
         });
     }
 
+    async function sendNotifySessionEmail(payload) {
+        await sgMail.send({
+            to: payload.recipientEmail,
+            from: fromEmail,
+            templateId: notifySessionTemplateId,
+            dynamicTemplateData: {
+                sessionId: payload.sessionId || "",
+                sessionName: payload.sessionName || "",
+                subjectLine: payload.subjectLine || "",
+                message: payload.message || "",
+            },
+        });
+    }
+
     async function sendSessionUpdatedEmail(payload) {
         await sgMail.send({
             to: payload.recipientEmail,
@@ -223,12 +251,14 @@ function createSendgridService() {
         confirmationTemplateId,
         invoiceFinalizedTemplateId,
         notifyAllUsersTemplateId,
+        notifySessionTemplateId,
         sessionUpdatedTemplateId,
         sessionCanceledTemplateId,
         sessionRescheduledTemplateId,
         sendUserConfirmedEmail,
         sendInvoiceFinalizedEmail,
         sendNotifyAllUsersEmail,
+        sendNotifySessionEmail,
         sendSessionUpdatedEmail,
         sendSessionCanceledEmail,
         sendSessionRescheduledEmail,

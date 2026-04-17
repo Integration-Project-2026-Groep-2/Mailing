@@ -3,11 +3,11 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
 const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
-const { processNotifyAllUsers } = require("../flows/notifyAllUsersFlows");
+const { processNotifySession } = require("../flows/newsNotifySessionFlows");
 
-const notifyAllUsersContractPath = path.resolve(
+const notifySessionContractPath = path.resolve(
     __dirname,
-    "../../contracts/notify_all_users_contract.xsd",
+    "../../contracts/news_notify_session_contract.xsd",
 );
 
 function parseBoolean(value, defaultValue = true) {
@@ -78,7 +78,7 @@ function validateWithXmllint(xml) {
     return new Promise((resolve, reject) => {
         const child = spawn(
             "xmllint",
-            ["--noout", "--schema", notifyAllUsersContractPath, "-"],
+            ["--noout", "--schema", notifySessionContractPath, "-"],
             { stdio: ["pipe", "pipe", "pipe"] },
         );
 
@@ -92,7 +92,7 @@ function validateWithXmllint(xml) {
             if (error.code === "ENOENT") {
                 reject(
                     createValidationError(
-                        "xmllint is required for news.notify.all XSD validation but was not found",
+                        "xmllint is required for news.notify.session XSD validation but was not found",
                     ),
                 );
                 return;
@@ -109,7 +109,7 @@ function validateWithXmllint(xml) {
 
             reject(
                 createValidationError(
-                    `news.notify.all XML failed XSD validation: ${stderr.trim() || "unknown xmllint error"}`,
+                    `news.notify.session XML failed XSD validation: ${stderr.trim() || "unknown xmllint error"}`,
                 ),
             );
         });
@@ -119,21 +119,33 @@ function validateWithXmllint(xml) {
     });
 }
 
-function createNotifyAllUsersConsumer({
+function extractParticipantIds(payload) {
+    const value = payload?.participantIds?.participantId;
+
+    if (!value) {
+        return [];
+    }
+
+    return Array.isArray(value) ? value : [value];
+}
+
+function createNewsNotifySessionConsumer({
     userRepository,
     mailLogRepository,
     sendgridService,
 }) {
     const enabled = parseBoolean(
-        process.env.NEWS_NOTIFY_ALL_SYNC_ENABLED,
+        process.env.NEWS_NOTIFY_SESSION_SYNC_ENABLED,
         true,
     );
-    const exchange = process.env.NEWS_NOTIFY_ALL_EXCHANGE || "news.topic";
-    const exchangeType = process.env.NEWS_NOTIFY_ALL_EXCHANGE_TYPE || "topic";
-    const queue = process.env.NEWS_NOTIFY_ALL_QUEUE || "mailing.news.updates";
+    const exchange = process.env.NEWS_NOTIFY_SESSION_EXCHANGE || "news.topic";
+    const exchangeType =
+        process.env.NEWS_NOTIFY_SESSION_EXCHANGE_TYPE || "topic";
+    const queue =
+        process.env.NEWS_NOTIFY_SESSION_QUEUE || "mailing.news.notify.session";
     const routingKey =
-        process.env.NEWS_NOTIFY_ALL_ROUTING_KEY || "news.notify.all";
-    const prefetch = Number(process.env.NEWS_NOTIFY_ALL_PREFETCH || 10);
+        process.env.NEWS_NOTIFY_SESSION_ROUTING_KEY || "news.notify.session";
+    const prefetch = Number(process.env.NEWS_NOTIFY_SESSION_PREFETCH || 10);
     const rabbitUrl = buildRabbitUrlFromEnv();
 
     const xmlParser = new XMLParser({
@@ -162,7 +174,7 @@ function createNotifyAllUsersConsumer({
 
                 if (!Number.isFinite(prefetch) || prefetch <= 0) {
                     throw new Error(
-                        "NEWS_NOTIFY_ALL_PREFETCH must be a positive number",
+                        "NEWS_NOTIFY_SESSION_PREFETCH must be a positive number",
                     );
                 }
 
@@ -175,17 +187,17 @@ function createNotifyAllUsersConsumer({
 
                 connection.on("error", (error) => {
                     console.error(
-                        `RabbitMQ news.notify.all connection error: ${error.message}`,
+                        `RabbitMQ news.notify.session connection error: ${error.message}`,
                     );
                 });
 
                 console.log(
-                    `News notify-all consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
+                    `News notify-session consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
                 console.error(
-                    `News notify-all consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
+                    `News notify-session consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
                 if (attempt === maxRetries) {
@@ -209,16 +221,18 @@ function createNotifyAllUsersConsumer({
             );
         }
 
-        const payload = parsed?.NotifyAllUsers;
+        const payload = parsed?.NotifySession;
         if (!payload || typeof payload !== "object") {
             throw createValidationError(
-                "Expected root <NotifyAllUsers> element in payload",
+                "Expected root <NotifySession> element in payload",
             );
         }
 
         return {
+            sessionId: payload.sessionId,
+            sessionName: payload.sessionName,
+            participantIds: extractParticipantIds(payload),
             subjectLine: payload.subjectLine,
-            updateType: payload.updateType,
             message: payload.message,
         };
     }
@@ -230,7 +244,7 @@ function createNotifyAllUsersConsumer({
 
         const payload = extractPayload(xmlContent);
 
-        await processNotifyAllUsers(payload, {
+        await processNotifySession(payload, {
             userRepository,
             mailLogRepository,
             sendgridService,
@@ -249,8 +263,10 @@ function createNotifyAllUsersConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error("Rejecting invalid news.notify.all payload", {
+                console.error("Rejecting invalid news.notify.session payload", {
                     ...errorContext,
+                    validationType: "XSD",
+                    schemaPath: notifySessionContractPath,
                     errorMessage: error.message,
                 });
                 channel.nack(msg, false, false);
@@ -258,7 +274,7 @@ function createNotifyAllUsersConsumer({
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error("Failed processing news.notify.all payload", {
+            console.error("Failed processing news.notify.session payload", {
                 ...errorContext,
                 shouldRequeue,
                 errorMessage: error.message,
@@ -269,7 +285,7 @@ function createNotifyAllUsersConsumer({
 
     async function start() {
         if (!enabled) {
-            console.log("News notify-all consumer is disabled");
+            console.log("News notify-session consumer is disabled");
             return;
         }
 
@@ -298,5 +314,5 @@ function createNotifyAllUsersConsumer({
 }
 
 module.exports = {
-    createNotifyAllUsersConsumer,
+    createNewsNotifySessionConsumer,
 };

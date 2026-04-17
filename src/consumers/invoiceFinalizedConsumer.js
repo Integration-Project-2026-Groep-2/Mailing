@@ -243,10 +243,10 @@ function createInvoiceFinalizedConsumer({
             );
         }
 
-        const payload = parsed?.invoice_finalized || parsed?.invoiceFinalized;
+        const payload = parsed?.InvoiceFinalized;
         if (!payload || typeof payload !== "object") {
             throw createValidationError(
-                "Expected root <invoice_finalized> element in payload",
+                "Expected root <InvoiceFinalized> element in payload",
             );
         }
 
