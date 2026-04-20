@@ -57,7 +57,7 @@ Optional CRM user sync variables:
 - `CRM_USER_SYNC_ENABLED` (default: `true`)
 - `CRM_USER_EXCHANGE` (default: `contact.topic`)
 - `CRM_USER_EXCHANGE_TYPE` (default: `topic`)
-- `CRM_USER_QUEUE` (default: `mailing.user.confirmed`)
+- `CRM_USER_QUEUE` (default: `mailing.crm.user.confirmed`)
 - `CRM_USER_ROUTING_KEY` (default: `crm.user.confirmed`)
 - `CRM_USER_PREFETCH` (default: `10`)
 - `SENDGRID_ENABLED` (default: `true`)
@@ -71,7 +71,7 @@ Optional CRM user deactivated sync variables:
 - `CRM_USER_DEACTIVATED_SYNC_ENABLED` (default: `true`)
 - `CRM_USER_DEACTIVATED_EXCHANGE` (default: `contact.topic`)
 - `CRM_USER_DEACTIVATED_EXCHANGE_TYPE` (default: `topic`)
-- `CRM_USER_DEACTIVATED_QUEUE` (default: `mailing.user.deactivated`)
+- `CRM_USER_DEACTIVATED_QUEUE` (default: `mailing.crm.user.deactivated`)
 - `CRM_USER_DEACTIVATED_ROUTING_KEY` (default: `crm.user.deactivated`)
 - `CRM_USER_DEACTIVATED_PREFETCH` (default: `10`)
 
@@ -80,7 +80,7 @@ Optional CRM user updated sync variables:
 - `CRM_USER_UPDATED_SYNC_ENABLED` (default: `true`)
 - `CRM_USER_UPDATED_EXCHANGE` (default: `contact.topic`)
 - `CRM_USER_UPDATED_EXCHANGE_TYPE` (default: `topic`)
-- `CRM_USER_UPDATED_QUEUE` (default: `mailing.user.updated`)
+- `CRM_USER_UPDATED_QUEUE` (default: `mailing.crm.user.updated`)
 - `CRM_USER_UPDATED_ROUTING_KEY` (default: `crm.user.updated`)
 - `CRM_USER_UPDATED_PREFETCH` (default: `10`)
 

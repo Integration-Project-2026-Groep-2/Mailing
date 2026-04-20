@@ -126,7 +126,8 @@ function createCrmUserUpdatedConsumer({ userRepository }) {
     );
     const exchange = process.env.CRM_USER_UPDATED_EXCHANGE || "contact.topic";
     const exchangeType = process.env.CRM_USER_UPDATED_EXCHANGE_TYPE || "topic";
-    const queue = process.env.CRM_USER_UPDATED_QUEUE || "mailing.user.updated";
+    const queue =
+        process.env.CRM_USER_UPDATED_QUEUE || "mailing.crm.user.updated";
     const routingKey =
         process.env.CRM_USER_UPDATED_ROUTING_KEY || "crm.user.updated";
     const prefetch = Number(process.env.CRM_USER_UPDATED_PREFETCH || 10);

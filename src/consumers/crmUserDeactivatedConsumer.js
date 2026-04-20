@@ -129,7 +129,8 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
     const exchangeType =
         process.env.CRM_USER_DEACTIVATED_EXCHANGE_TYPE || "topic";
     const queue =
-        process.env.CRM_USER_DEACTIVATED_QUEUE || "mailing.user.deactivated";
+        process.env.CRM_USER_DEACTIVATED_QUEUE ||
+        "mailing.crm.user.deactivated";
     const routingKey =
         process.env.CRM_USER_DEACTIVATED_ROUTING_KEY || "crm.user.deactivated";
     const prefetch = Number(process.env.CRM_USER_DEACTIVATED_PREFETCH || 10);
