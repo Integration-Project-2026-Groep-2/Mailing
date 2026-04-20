@@ -127,7 +127,7 @@ function createCrmUserConfirmedConsumer({
     const enabled = parseBoolean(process.env.CRM_USER_SYNC_ENABLED, true);
     const exchange = process.env.CRM_USER_EXCHANGE || "contact.topic";
     const exchangeType = process.env.CRM_USER_EXCHANGE_TYPE || "topic";
-    const queue = process.env.CRM_USER_QUEUE || "mailing.crm.user.confirmed";
+    const queue = process.env.CRM_USER_QUEUE || "mailing.user.confirmed";
     const routingKey = process.env.CRM_USER_ROUTING_KEY || "crm.user.confirmed";
     const prefetch = Number(process.env.CRM_USER_PREFETCH || 10);
     const rabbitUrl = buildRabbitUrlFromEnv();
