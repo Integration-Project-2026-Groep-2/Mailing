@@ -3,7 +3,9 @@ async function sendToParticipant(
     payload,
     { userRepository, mailLogRepository, sendgridService },
 ) {
-    const user = await userRepository.findUserById(participantId);
+    const user =
+        (await userRepository.findUserByCrmMasterId(participantId)) ||
+        (await userRepository.findUserById(participantId));
     if (!user || !user.email || user.isActive === false) {
         return;
     }

@@ -9,6 +9,7 @@ test("mapPersistedUser normalizes persisted rows", () => {
     assert.deepEqual(
         mapPersistedUser({
             id: "11111111-1111-4111-8111-111111111111",
+            crmMasterId: "22222222-2222-4222-8222-222222222222",
             email: "Alice@Example.com",
             firstName: " Alice ",
             lastName: null,
@@ -17,6 +18,7 @@ test("mapPersistedUser normalizes persisted rows", () => {
         }),
         {
             id: "11111111-1111-4111-8111-111111111111",
+            crmMasterId: "22222222-2222-4222-8222-222222222222",
             email: "Alice@Example.com",
             firstName: "Alice",
             lastName: null,
@@ -50,8 +52,7 @@ test("findUserByEmail queries the database and maps the result", async () => {
 
 test("replaceUserId moves mail logs and user row in a transaction", async () => {
     const pool = createMockPool();
-    const connection = createMockConnection();
-    pool.getConnection.mockResolvedValue(connection);
+    pool.query.mockResolvedValue([{}, undefined]);
     const repository = createUserRepository(pool);
 
     await repository.replaceUserId(
@@ -59,10 +60,12 @@ test("replaceUserId moves mail logs and user row in a transaction", async () => 
         "22222222-2222-4222-8222-222222222222",
     );
 
-    assert.equal(connection.beginTransaction.mock.calls.length, 1);
-    assert.equal(connection.commit.mock.calls.length, 1);
-    assert.equal(connection.rollback.mock.calls.length, 0);
-    assert.equal(connection.release.mock.calls.length, 1);
+    assert.equal(pool.query.mock.calls.length, 1);
+    assert.match(pool.query.mock.calls[0][0], /SET crmMasterId = \?/);
+    assert.deepEqual(pool.query.mock.calls[0][1], [
+        "22222222-2222-4222-8222-222222222222",
+        "11111111-1111-4111-8111-111111111111",
+    ]);
 });
 
 test("upsertUser writes the expected user snapshot", async () => {
@@ -72,6 +75,7 @@ test("upsertUser writes the expected user snapshot", async () => {
 
     await repository.upsertUser({
         id: "11111111-1111-4111-8111-111111111111",
+        crmMasterId: "22222222-2222-4222-8222-222222222222",
         email: "alice@example.com",
         firstName: "Alice",
         lastName: "Example",
@@ -82,6 +86,7 @@ test("upsertUser writes the expected user snapshot", async () => {
     assert.equal(pool.query.mock.calls.length, 1);
     assert.deepEqual(pool.query.mock.calls[0][1], [
         "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
         "alice@example.com",
         "Alice",
         "Example",

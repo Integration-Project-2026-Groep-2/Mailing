@@ -21,10 +21,11 @@ test("confirmed user flow reconciles user, sends email, and logs success", async
             id: "22222222-2222-4222-8222-222222222222",
             email: rawUser.email,
         }),
-        findUserById: jest.fn().mockResolvedValue(null),
-        replaceUserId: jest.fn().mockResolvedValue(undefined),
+        findUserByCrmMasterId: jest.fn().mockResolvedValue(null),
         upsertUser: jest.fn().mockResolvedValue({
             ...rawUser,
+            id: "22222222-2222-4222-8222-222222222222",
+            crmMasterId: rawUser.id,
             companyId: null,
         }),
     };
@@ -42,11 +43,19 @@ test("confirmed user flow reconciles user, sends email, and logs success", async
         sendgridService,
     });
 
-    assert.equal(userRepository.replaceUserId.mock.calls.length, 1);
     assert.equal(userRepository.upsertUser.mock.calls.length, 1);
+    assert.deepEqual(userRepository.upsertUser.mock.calls[0][0], {
+        id: "22222222-2222-4222-8222-222222222222",
+        crmMasterId: rawUser.id,
+        email: rawUser.email,
+        firstName: rawUser.firstName,
+        lastName: rawUser.lastName,
+        isActive: rawUser.isActive,
+        companyId: rawUser.companyId,
+    });
     assert.equal(sendgridService.sendUserConfirmedEmail.mock.calls.length, 1);
     assert.deepEqual(mailLogRepository.insertMailLog.mock.calls[0][0], {
-        userId: rawUser.id,
+        userId: "22222222-2222-4222-8222-222222222222",
         templateId: "template-confirmed",
         status: "SENT",
     });
@@ -66,9 +75,11 @@ test("confirmed user flow records failed send attempts", async () => {
     const sendError = new Error("send failed");
     const userRepository = {
         findUserByEmail: jest.fn().mockResolvedValue(null),
-        findUserById: jest.fn().mockResolvedValue(null),
-        replaceUserId: jest.fn(),
-        upsertUser: jest.fn().mockResolvedValue(rawUser),
+        findUserByCrmMasterId: jest.fn().mockResolvedValue(null),
+        upsertUser: jest.fn().mockResolvedValue({
+            ...rawUser,
+            crmMasterId: rawUser.id,
+        }),
     };
     const mailLogRepository = {
         insertMailLog: jest.fn().mockResolvedValue(undefined),
@@ -102,20 +113,20 @@ test("deactivated user flow deactivates by identity after reconciliation", async
     };
 
     const userRepository = {
+        findUserByCrmMasterId: jest.fn().mockResolvedValue(null),
         findUserByEmail: jest.fn().mockResolvedValue({
             id: "22222222-2222-4222-8222-222222222222",
             email: payload.email,
         }),
-        findUserById: jest.fn().mockResolvedValue(null),
-        replaceUserId: jest.fn().mockResolvedValue(undefined),
+        setCrmMasterIdByLocalId: jest.fn().mockResolvedValue(undefined),
         deactivateUserByIdentity: jest.fn().mockResolvedValue(1),
     };
 
     await processCrmUserDeactivatedUser(payload, { userRepository });
 
-    assert.equal(userRepository.replaceUserId.mock.calls.length, 1);
+    assert.equal(userRepository.setCrmMasterIdByLocalId.mock.calls.length, 1);
     assert.deepEqual(userRepository.deactivateUserByIdentity.mock.calls[0][0], {
-        id: payload.id,
+        id: "22222222-2222-4222-8222-222222222222",
         email: payload.email,
     });
 });
@@ -141,11 +152,14 @@ test("updated user flow persists the CRM snapshot without sending email", async 
     };
 
     const userRepository = {
-        findUserByEmail: jest.fn().mockResolvedValue(null),
-        findUserById: jest.fn().mockResolvedValue(null),
-        replaceUserId: jest.fn(),
+        findUserByCrmMasterId: jest.fn().mockResolvedValue(null),
+        findUserByEmail: jest.fn().mockResolvedValue({
+            id: "44444444-4444-4444-8444-444444444444",
+            email: payload.email,
+        }),
         upsertUser: jest.fn().mockResolvedValue({
-            id: payload.id,
+            id: "44444444-4444-4444-8444-444444444444",
+            crmMasterId: payload.id,
             email: payload.email,
         }),
     };
@@ -154,7 +168,8 @@ test("updated user flow persists the CRM snapshot without sending email", async 
 
     assert.equal(userRepository.upsertUser.mock.calls.length, 1);
     assert.deepEqual(userRepository.upsertUser.mock.calls[0][0], {
-        id: payload.id,
+        id: "44444444-4444-4444-8444-444444444444",
+        crmMasterId: payload.id,
         email: payload.email,
         firstName: payload.firstName,
         lastName: payload.lastName,
