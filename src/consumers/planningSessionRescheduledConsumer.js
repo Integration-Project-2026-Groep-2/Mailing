@@ -235,6 +235,7 @@ function createPlanningSessionRescheduledConsumer({
 
         return {
             sessionId: payload.sessionId,
+            sessionName: payload.sessionName,
             oldDate: payload.oldDate,
             oldStartTime: payload.oldStartTime,
             oldEndTime: payload.oldEndTime,
