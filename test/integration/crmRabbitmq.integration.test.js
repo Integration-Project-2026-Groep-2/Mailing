@@ -107,16 +107,19 @@ describe("RabbitMQ CRM -> Mailing integration", () => {
         await waitForCondition(
             async () => {
                 const user = await getUserByEmail(pool, email);
-                return user && user.id === crmUserId;
+                return (
+                    user && user.id === userId && user.crmMasterId === crmUserId
+                );
             },
             { timeoutMs: 45000, intervalMs: 1500 },
         );
 
         const user = await getUserByEmail(pool, email);
-        assert.equal(user.id, crmUserId);
+        assert.equal(user.id, userId);
+        assert.equal(user.crmMasterId, crmUserId);
         assert.equal(user.isActive, 1);
 
-        const mailLog = await getLatestMailLog(pool, crmUserId);
+        const mailLog = await getLatestMailLog(pool, userId);
         assert.ok(mailLog, "Expected a mail log row for confirmed user");
         assert.equal(mailLog.status, "SENT");
     });
@@ -165,6 +168,7 @@ describe("RabbitMQ CRM -> Mailing integration", () => {
         await deleteUserByEmail(pool, email);
         await seedUser(pool, {
             id: localId,
+            crmMasterId: crmId,
             email,
             firstName: "Before",
             lastName: "Deactivate",
@@ -189,13 +193,19 @@ describe("RabbitMQ CRM -> Mailing integration", () => {
         await waitForCondition(
             async () => {
                 const user = await getUserByEmail(pool, email);
-                return user && user.id === crmId && Number(user.isActive) === 0;
+                return (
+                    user &&
+                    user.id === localId &&
+                    user.crmMasterId === crmId &&
+                    Number(user.isActive) === 0
+                );
             },
             { timeoutMs: 45000, intervalMs: 1500 },
         );
 
         const user = await getUserByEmail(pool, email);
-        assert.equal(user.id, crmId);
+        assert.equal(user.id, localId);
+        assert.equal(user.crmMasterId, crmId);
         assert.equal(Number(user.isActive), 0);
     });
 });

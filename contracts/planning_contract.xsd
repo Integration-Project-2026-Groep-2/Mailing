@@ -107,13 +107,14 @@
   <xs:element name="SessionUpdated">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="sessionId"              type="UUIDType"/>
-        <xs:element name="sessionName"            type="xs:string"/>
-        <xs:element name="changeType"             type="ChangeTypeType"/>
-        <xs:element name="newTime"                type="ISO8601DateTimeType" minOccurs="0"/>
-        <xs:element name="newLocation"            type="xs:string"           minOccurs="0"/>
-        <xs:element name="participantIds" type="ParticipantIdsType"      minOccurs="0"/>
-        <xs:element name="timestamp"              type="ISO8601DateTimeType"/>
+        <xs:element name="sessionId" type="UUIDType"/>
+        <xs:element name="sessionName" type="xs:string"/>
+        <xs:element name="changeType" type="ChangeTypeType"/>
+        <xs:element name="newTime" type="ISO8601DateTimeType" minOccurs="0"/>
+        <xs:element name="newLocation" type="xs:string" minOccurs="0"/>
+        <xs:element name="participantIds" type="ParticipantIdsType" minOccurs="0"/>
+        <xs:element name="icsData" type="xs:string" minOccurs="0"/>
+        <xs:element name="timestamp" type="ISO8601DateTimeType"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -133,7 +134,8 @@
         <xs:element name="status" type="SessionStatusType"/>
         <xs:element name="reason" type="xs:string" minOccurs="0"/>
         <xs:element name="participantIds" type="ParticipantIdsType" minOccurs="0"/>
-        <xs:element name="timestamp"              type="ISO8601DateTimeType"/>
+        <xs:element name="icsData" type="xs:string" minOccurs="0"/>
+        <xs:element name="timestamp" type="ISO8601DateTimeType"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -158,7 +160,8 @@
         <xs:element name="newLocation" type="xs:string" minOccurs="0"/>
         <xs:element name="reason" type="xs:string" minOccurs="0"/>
         <xs:element name="participantIds" type="ParticipantIdsType" minOccurs="0"/>
-        <xs:element name="timestamp"              type="ISO8601DateTimeType"/>
+        <xs:element name="icsData" type="xs:string" minOccurs="0"/>
+        <xs:element name="timestamp" type="ISO8601DateTimeType"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -172,11 +175,11 @@
   <xs:element name="SessionFull">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="sessionId"            type="UUIDType"/>
+        <xs:element name="sessionId" type="UUIDType"/>
         <xs:element name="currentRegistrations" type="xs:nonNegativeInteger"/>
-        <xs:element name="capacity"             type="PositiveIntType"/>
-        <xs:element name="crmMasterId"          type="UUIDType"           minOccurs="0"/>
-        <xs:element name="timestamp"            type="ISO8601DateTimeType"/>
+        <xs:element name="capacity" type="PositiveIntType"/>
+        <xs:element name="crmMasterId" type="UUIDType" minOccurs="0"/>
+        <xs:element name="timestamp" type="ISO8601DateTimeType"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>

@@ -8,7 +8,7 @@ const {
     createTemporaryQueue,
     deleteUserByEmail,
     getUserByEmail,
-    waitForCondition,
+    seedUser,
     waitForHealth,
     assertXmlRoot,
 } = require("./integrationHelpers");
@@ -47,7 +47,7 @@ describe("RabbitMQ Mailing -> CRM integration", () => {
         }
     });
 
-    test("publishes mailing.user.created when a user is created", async () => {
+    test("publishes mailing.user.created with local id when crmMasterId is missing", async () => {
         const email = `integration-${Date.now()}-created@example.com`;
         await deleteUserByEmail(pool, email);
 
@@ -66,28 +66,37 @@ describe("RabbitMQ Mailing -> CRM integration", () => {
 
         assert.equal(response.status, 201);
         const payload = await response.json();
+        assert.equal(payload.user.email, email);
 
         const message = await consumeOnce(rabbit.channel, queue);
         const root = assertXmlRoot(message.content, "MailingUserCreated");
         assert.equal(root.email, email);
+        assert.equal(root.id, payload.user.id);
         assert.equal(root.isActive, true);
-        assert.equal(payload.user.email, email);
 
         message.ack();
+
+        const user = await getUserByEmail(pool, email);
+        assert.ok(user);
+        assert.equal(user.crmMasterId, null);
 
         await deleteUserByEmail(pool, email);
     });
 
     test("publishes mailing.user.updated when a user is updated", async () => {
         const createEmail = `integration-${Date.now()}-update@example.com`;
-        const createResponse = await jsonRequest("/users", "POST", {
+        const localId = randomUUID();
+        const crmMasterId = randomUUID();
+        await deleteUserByEmail(pool, createEmail);
+        await seedUser(pool, {
+            id: localId,
+            crmMasterId,
             email: createEmail,
             firstName: "Original",
             lastName: "User",
             isActive: true,
+            companyId: null,
         });
-        assert.equal(createResponse.status, 201);
-        const created = await createResponse.json();
 
         const queue = await createTemporaryQueue(
             rabbit.channel,
@@ -95,20 +104,17 @@ describe("RabbitMQ Mailing -> CRM integration", () => {
             "mailing.user.updated",
         );
 
-        const updateResponse = await jsonRequest(
-            `/users/${created.user.id}`,
-            "PUT",
-            {
-                firstName: "Updated",
-                lastName: "User",
-                isActive: false,
-            },
-        );
+        const updateResponse = await jsonRequest(`/users/${localId}`, "PUT", {
+            firstName: "Updated",
+            lastName: "User",
+            isActive: false,
+        });
 
         assert.equal(updateResponse.status, 200);
         const message = await consumeOnce(rabbit.channel, queue);
         const root = assertXmlRoot(message.content, "MailingUserUpdated");
         assert.equal(root.email, createEmail);
+        assert.equal(root.id, crmMasterId);
         assert.equal(root.isActive, false);
 
         message.ack();
@@ -118,14 +124,18 @@ describe("RabbitMQ Mailing -> CRM integration", () => {
 
     test("publishes mailing.user.deactivated when a user is deactivated", async () => {
         const email = `integration-${Date.now()}-deactivated@example.com`;
-        const createResponse = await jsonRequest("/users", "POST", {
+        const localId = randomUUID();
+        const crmMasterId = randomUUID();
+        await deleteUserByEmail(pool, email);
+        await seedUser(pool, {
+            id: localId,
+            crmMasterId,
             email,
             firstName: "Before",
             lastName: "Deactivate",
             isActive: true,
+            companyId: null,
         });
-        assert.equal(createResponse.status, 201);
-        const created = await createResponse.json();
 
         const queue = await createTemporaryQueue(
             rabbit.channel,
@@ -134,13 +144,14 @@ describe("RabbitMQ Mailing -> CRM integration", () => {
         );
 
         const deactivateResponse = await jsonRequest(
-            `/users/${created.user.id}/deactivate`,
+            `/users/${localId}/deactivate`,
             "POST",
         );
 
         assert.equal(deactivateResponse.status, 200);
         const message = await consumeOnce(rabbit.channel, queue);
         const root = assertXmlRoot(message.content, "MailingUserDeactivated");
+        assert.equal(root.id, crmMasterId);
         assert.equal(root.email, email);
         assert.ok(root.deactivatedAt);
 

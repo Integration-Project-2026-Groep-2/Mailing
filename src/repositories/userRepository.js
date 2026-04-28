@@ -48,6 +48,7 @@ function normalizeBoolean(value, fieldName) {
 function mapPersistedUser(rawUser) {
     return {
         id: normalizeRequiredString(rawUser.id, "id"),
+        crmMasterId: normalizeOptionalString(rawUser.crmMasterId),
         email: normalizeRequiredString(rawUser.email, "email"),
         firstName: normalizeOptionalString(rawUser.firstName),
         lastName: normalizeOptionalString(rawUser.lastName),
@@ -69,7 +70,7 @@ function createUserRepository(pool) {
         const normalizedId = normalizeRequiredString(id, "id");
         const [rows] = await pool.query(
             `
-            SELECT id, email, firstName, lastName, isActive, companyId
+            SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId
             FROM users
             WHERE id = ?
             LIMIT 1
@@ -88,7 +89,7 @@ function createUserRepository(pool) {
         const normalizedEmail = normalizeRequiredString(email, "email");
         const [rows] = await pool.query(
             `
-            SELECT id, email, firstName, lastName, isActive, companyId
+            SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId
             FROM users
             WHERE email = ?
             LIMIT 1
@@ -103,10 +104,32 @@ function createUserRepository(pool) {
         return mapPersistedUser(rows[0]);
     }
 
+    async function findUserByCrmMasterId(crmMasterId) {
+        const normalizedCrmMasterId = normalizeRequiredString(
+            crmMasterId,
+            "crmMasterId",
+        );
+        const [rows] = await pool.query(
+            `
+            SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId
+            FROM users
+            WHERE crmMasterId = ?
+            LIMIT 1
+            `,
+            [normalizedCrmMasterId],
+        );
+
+        if (!rows[0]) {
+            return null;
+        }
+
+        return mapPersistedUser(rows[0]);
+    }
+
     async function findActiveUsers() {
         const [rows] = await pool.query(
             `
-            SELECT id, email, firstName, lastName, isActive, companyId
+            SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId
             FROM users
             WHERE isActive = TRUE
             ORDER BY updatedAt DESC
@@ -120,39 +143,31 @@ function createUserRepository(pool) {
         const normalizedOldId = normalizeRequiredString(oldId, "oldId");
         const normalizedNewId = normalizeRequiredString(newId, "newId");
 
-        if (normalizedOldId === normalizedNewId) {
-            return;
-        }
+        await pool.query(
+            `
+            UPDATE users
+            SET crmMasterId = ?, updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ?
+            `,
+            [normalizedNewId, normalizedOldId],
+        );
+    }
 
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
+    async function setCrmMasterIdByLocalId(localId, crmMasterId) {
+        const normalizedLocalId = normalizeRequiredString(localId, "localId");
+        const normalizedCrmMasterId = normalizeRequiredString(
+            crmMasterId,
+            "crmMasterId",
+        );
 
-            await connection.query(
-                `
-                UPDATE mail_logs
-                SET userId = ?
-                WHERE userId = ?
-                `,
-                [normalizedNewId, normalizedOldId],
-            );
-
-            await connection.query(
-                `
-                UPDATE users
-                SET id = ?, updatedAt = CURRENT_TIMESTAMP
-                WHERE id = ?
-                `,
-                [normalizedNewId, normalizedOldId],
-            );
-
-            await connection.commit();
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
+        await pool.query(
+            `
+            UPDATE users
+            SET crmMasterId = ?, updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ?
+            `,
+            [normalizedCrmMasterId, normalizedLocalId],
+        );
     }
 
     async function upsertUser(rawUser) {
@@ -160,18 +175,20 @@ function createUserRepository(pool) {
 
         await pool.query(
             `
-            INSERT INTO users (id, email, firstName, lastName, isActive, companyId)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO users (id, crmMasterId, email, firstName, lastName, isActive, companyId)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 email = VALUES(email),
                 firstName = VALUES(firstName),
                 lastName = VALUES(lastName),
                 isActive = VALUES(isActive),
+                crmMasterId = COALESCE(VALUES(crmMasterId), crmMasterId),
                 companyId = VALUES(companyId),
                 updatedAt = CURRENT_TIMESTAMP
             `,
             [
                 user.id,
+                user.crmMasterId,
                 user.email,
                 user.firstName,
                 user.lastName,
@@ -232,9 +249,11 @@ function createUserRepository(pool) {
         deactivateUserByIdentity,
         deleteUserByIdentity,
         findActiveUsers,
+        findUserByCrmMasterId,
         findUserById,
         findUserByEmail,
         replaceUserId,
+        setCrmMasterIdByLocalId,
         upsertUser,
     };
 }

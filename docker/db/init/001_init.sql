@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
     id CHAR(36) PRIMARY KEY,
+    crmMasterId CHAR(36) NULL UNIQUE,
     email VARCHAR(254) UNIQUE NOT NULL,
     firstName VARCHAR(80),
     lastName VARCHAR(80),

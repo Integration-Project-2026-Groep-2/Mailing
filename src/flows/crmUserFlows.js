@@ -1,24 +1,50 @@
+const { randomUUID } = require("crypto");
+
+async function resolveLocalIdForCrmIdentity(rawUser, userRepository) {
+    const existingByEmail = await userRepository.findUserByEmail(rawUser.email);
+    const existingByCrmMasterId = await userRepository.findUserByCrmMasterId(
+        rawUser.id,
+    );
+
+    if (
+        existingByEmail &&
+        existingByCrmMasterId &&
+        existingByEmail.id !== existingByCrmMasterId.id
+    ) {
+        throw new Error(
+            "CRM reconciliation conflict: email and crmMasterId resolve to different users",
+        );
+    }
+
+    if (existingByEmail) {
+        return existingByEmail.id;
+    }
+
+    if (existingByCrmMasterId) {
+        return existingByCrmMasterId.id;
+    }
+
+    return randomUUID();
+}
+
 function processCrmUserConfirmedUser(
     rawUser,
     { userRepository, mailLogRepository, sendgridService },
 ) {
     return (async () => {
-        const existingByEmail = await userRepository.findUserByEmail(
-            rawUser.email,
+        const localId = await resolveLocalIdForCrmIdentity(
+            rawUser,
+            userRepository,
         );
-        if (existingByEmail && existingByEmail.id !== rawUser.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                rawUser.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
-                    rawUser.id,
-                );
-            }
-        }
-
-        const persistedUser = await userRepository.upsertUser(rawUser);
+        const persistedUser = await userRepository.upsertUser({
+            id: localId,
+            crmMasterId: rawUser.id,
+            email: rawUser.email,
+            firstName: rawUser.firstName,
+            lastName: rawUser.lastName,
+            isActive: rawUser.isActive,
+            companyId: rawUser.companyId,
+        });
 
         try {
             await sendgridService.sendUserConfirmedEmail({
@@ -43,47 +69,39 @@ function processCrmUserConfirmedUser(
 
 function processCrmUserDeactivatedUser(payload, { userRepository }) {
     return (async () => {
-        const existingByEmail = await userRepository.findUserByEmail(
-            payload.email,
-        );
-        if (existingByEmail && existingByEmail.id !== payload.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                payload.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
+        let user = await userRepository.findUserByCrmMasterId(payload.id);
+
+        if (!user) {
+            user = await userRepository.findUserByEmail(payload.email);
+            if (user) {
+                await userRepository.setCrmMasterIdByLocalId(
+                    user.id,
                     payload.id,
                 );
             }
         }
 
+        if (!user) {
+            return 0;
+        }
+
         return userRepository.deactivateUserByIdentity({
-            id: payload.id,
-            email: payload.email,
+            id: user.id,
+            email: user.email,
         });
     })();
 }
 
 function processCrmUserUpdatedUser(payload, { userRepository }) {
     return (async () => {
-        const existingByEmail = await userRepository.findUserByEmail(
-            payload.email,
+        const localId = await resolveLocalIdForCrmIdentity(
+            payload,
+            userRepository,
         );
-        if (existingByEmail && existingByEmail.id !== payload.id) {
-            const existingByCrmId = await userRepository.findUserById(
-                payload.id,
-            );
-            if (!existingByCrmId) {
-                await userRepository.replaceUserId(
-                    existingByEmail.id,
-                    payload.id,
-                );
-            }
-        }
 
         await userRepository.upsertUser({
-            id: payload.id,
+            id: localId,
+            crmMasterId: payload.id,
             email: payload.email,
             firstName: payload.firstName,
             lastName: payload.lastName,

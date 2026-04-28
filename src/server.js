@@ -176,6 +176,7 @@ function parseCreateUserPayload(body) {
     const payload = body || {};
     return {
         id: randomUUID(),
+        crmMasterId: null,
         email: normalizeEmail(payload.email),
         firstName: normalizeOptionalString(payload.firstName),
         lastName: normalizeOptionalString(payload.lastName),
@@ -199,6 +200,7 @@ function parseUpdateUserPayload(existingUser, body) {
 
     return {
         id: existingUser.id,
+        crmMasterId: existingUser.crmMasterId,
         email: existingUser.email,
         firstName:
             payload.firstName === undefined
@@ -253,6 +255,15 @@ function handleApiError(res, error, options = {}) {
 
     if (error?.isValidationError) {
         res.status(422).json({ error: error.message });
+        return;
+    }
+
+    if (error?.code === "MISSING_MASTER_UUID") {
+        res.status(409).json({
+            error: "User is not CRM-reconciled; XML publication is blocked",
+            details: error.message,
+            persisted: true,
+        });
         return;
     }
 
@@ -319,7 +330,7 @@ app.get("/health", async (_req, res) => {
 app.get("/users", async (_req, res) => {
     try {
         const [rows] = await pool.query(
-            "SELECT id, email, firstName, lastName, isActive, companyId, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 100",
+            "SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId, updatedAt FROM users ORDER BY updatedAt DESC LIMIT 100",
         );
         res.status(200).json(rows);
     } catch (error) {
@@ -424,7 +435,9 @@ app.post("/users", async (req, res) => {
         try {
             await mailingUserPublisher.publishUserCreated(persistedUser);
         } catch (error) {
-            error.code = "PUBLISH_FAILED";
+            if (!error.code) {
+                error.code = "PUBLISH_FAILED";
+            }
             throw error;
         }
 
@@ -472,7 +485,9 @@ app.put("/users/:id", async (req, res) => {
         try {
             await mailingUserPublisher.publishUserUpdated(persistedUser);
         } catch (error) {
-            error.code = "PUBLISH_FAILED";
+            if (!error.code) {
+                error.code = "PUBLISH_FAILED";
+            }
             throw error;
         }
 
@@ -532,11 +547,14 @@ app.post("/users/:id/deactivate", async (req, res) => {
         try {
             await mailingUserPublisher.publishUserDeactivated({
                 id: existingUser.id,
+                crmMasterId: existingUser.crmMasterId,
                 email: existingUser.email,
                 deactivatedAt,
             });
         } catch (error) {
-            error.code = "PUBLISH_FAILED";
+            if (!error.code) {
+                error.code = "PUBLISH_FAILED";
+            }
             throw error;
         }
 
@@ -571,9 +589,6 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
         return;
     }
 
-    let connection;
-    let transactionStarted = false;
-
     try {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
@@ -586,72 +601,66 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
             return;
         }
 
-        connection = await pool.getConnection();
-        await connection.beginTransaction();
-        transactionStarted = true;
-
-        const deletedRows = await userRepository.deleteUserByIdentity(
-            {
-                id: existingUser.id,
-                email: existingUser.email,
-            },
-            connection,
-        );
+        // Delete user from database first (no transaction - deletion is committed immediately)
+        const deletedRows = await userRepository.deleteUserByIdentity({
+            id: existingUser.id,
+            email: existingUser.email,
+        });
 
         if (deletedRows === 0) {
-            throw new Error(
-                "User delete failed: user identity no longer matches",
-            );
+            console.error("[api.users] permanent-delete failed", {
+                reason: "user identity no longer matches",
+                id: userId,
+            });
+            res.status(409).json({
+                error: "User delete failed: user identity no longer matches",
+            });
+            return;
         }
 
+        // Try to publish deactivation message, but don't fail deletion if it doesn't succeed
         const deactivatedAt = new Date().toISOString();
+        let publishError = null;
         try {
             await mailingUserPublisher.publishUserDeactivated({
                 id: existingUser.id,
+                crmMasterId: existingUser.crmMasterId,
                 email: existingUser.email,
                 deactivatedAt,
             });
         } catch (error) {
-            error.code = "PUBLISH_FAILED";
-            throw error;
+            // Capture error but don't fail the response - deletion already committed
+            publishError = error;
+            logFlowError("api.users", "permanent-delete-publish", error, {
+                id: userId,
+            });
         }
 
-        await connection.commit();
-        transactionStarted = false;
-
-        res.status(200).json({
-            status: "deleted_and_published",
-            user: existingUser,
-            deactivatedAt,
-        });
+        // Return success if deletion succeeded, regardless of publish status
+        if (publishError) {
+            res.status(200).json({
+                status: "deleted_but_publish_failed",
+                user: existingUser,
+                deactivatedAt,
+                publishError: publishError.message,
+            });
+        } else {
+            res.status(200).json({
+                status: "deleted_and_published",
+                user: existingUser,
+                deactivatedAt,
+            });
+        }
     } catch (error) {
-        if (connection && transactionStarted) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                logFlowError(
-                    "api.users",
-                    "permanent-delete-rollback",
-                    rollbackError,
-                    { id: req.params?.id },
-                );
-            }
-        }
-
         handleApiError(res, error, {
             flow: "api.users",
             operation: "permanent-delete",
-            publishFailedMessage:
-                "User deletion was rolled back because deactivation message publication failed",
+            publishFailedMessage: "User deletion failed",
             publishFailedPersisted: false,
             context: {
                 id: req.params?.id,
             },
         });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 

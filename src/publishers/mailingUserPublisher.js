@@ -42,9 +42,32 @@ function normalizeXmlString(value) {
     return String(value).trim();
 }
 
-function toMailingUserXml(rootElement, rawUser) {
+function resolveMasterUuid(rawUser) {
+    const crmMasterId = normalizeOptionalXmlString(rawUser.crmMasterId);
+    if (!crmMasterId) {
+        const error = new Error(
+            "Cannot publish user XML without crmMasterId (CRM reconciliation required)",
+        );
+        error.code = "MISSING_MASTER_UUID";
+        throw error;
+    }
+
+    return crmMasterId;
+}
+
+function resolveCreateUserId(rawUser) {
+    return normalizeXmlString(rawUser.id);
+}
+
+function toMailingUserXml(
+    rootElement,
+    rawUser,
+    { allowLocalIdFallback = false } = {},
+) {
     const user = {
-        id: normalizeXmlString(rawUser.id),
+        id: allowLocalIdFallback
+            ? resolveCreateUserId(rawUser)
+            : resolveMasterUuid(rawUser),
         email: normalizeXmlString(rawUser.email),
         firstName: normalizeOptionalXmlString(rawUser.firstName),
         lastName: normalizeOptionalXmlString(rawUser.lastName),
@@ -73,7 +96,7 @@ function toMailingUserXml(rootElement, rawUser) {
 
 function toMailingUserDeactivatedXml(rawUser) {
     const payload = {
-        id: normalizeXmlString(rawUser.id),
+        id: resolveMasterUuid(rawUser),
         email: normalizeXmlString(rawUser.email),
         deactivatedAt: normalizeXmlString(rawUser.deactivatedAt),
     };
@@ -226,7 +249,9 @@ function createMailingUserPublisher() {
         await publish(
             "MailingUserCreated",
             createdRoutingKey,
-            toMailingUserXml("MailingUserCreated", user),
+            toMailingUserXml("MailingUserCreated", user, {
+                allowLocalIdFallback: true,
+            }),
         );
     }
 

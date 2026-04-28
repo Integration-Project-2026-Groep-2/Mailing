@@ -92,9 +92,10 @@ async function connectDatabase() {
 async function seedUser(pool, user) {
     await pool.query(
         `
-        INSERT INTO users (id, email, firstName, lastName, isActive, companyId)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO users (id, crmMasterId, email, firstName, lastName, isActive, companyId)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
+            crmMasterId = COALESCE(VALUES(crmMasterId), crmMasterId),
             email = VALUES(email),
             firstName = VALUES(firstName),
             lastName = VALUES(lastName),
@@ -104,6 +105,7 @@ async function seedUser(pool, user) {
         `,
         [
             user.id,
+            user.crmMasterId || null,
             user.email,
             user.firstName || null,
             user.lastName || null,
@@ -120,7 +122,7 @@ async function deleteUserByEmail(pool, email) {
 async function getUserByEmail(pool, email) {
     const [rows] = await pool.query(
         `
-        SELECT id, email, firstName, lastName, isActive, companyId
+        SELECT id, crmMasterId, email, firstName, lastName, isActive, companyId
         FROM users
         WHERE email = ?
         LIMIT 1
