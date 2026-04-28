@@ -219,6 +219,7 @@ function createSendgridService() {
             templateId: sessionCanceledTemplateId,
             dynamicTemplateData: {
                 sessionId: payload.sessionId || "",
+                sessionName: payload.sessionName || "",
                 status: payload.status || "",
                 reason: payload.reason || "",
                 timestamp: payload.timestamp || "",
@@ -233,6 +234,7 @@ function createSendgridService() {
             templateId: sessionRescheduledTemplateId,
             dynamicTemplateData: {
                 sessionId: payload.sessionId || "",
+                sessionName: payload.sessionName || "",
                 oldDate: payload.oldDate || "",
                 oldStartTime: payload.oldStartTime || "",
                 oldEndTime: payload.oldEndTime || "",

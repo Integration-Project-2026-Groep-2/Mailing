@@ -235,6 +235,7 @@ function createPlanningSessionCancelledConsumer({
 
         return {
             sessionId: payload.sessionId,
+            sessionName: payload.sessionName,
             status: payload.status,
             reason: payload.reason,
             participantIds: extractParticipantIds(payload),

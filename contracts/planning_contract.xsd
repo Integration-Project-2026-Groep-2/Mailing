@@ -130,6 +130,7 @@
     <xs:complexType>
       <xs:sequence>
         <xs:element name="sessionId" type="UUIDType"/>
+        <xs:element name="sessionName" type="xs:string"/>
         <xs:element name="status" type="SessionStatusType"/>
         <xs:element name="reason" type="xs:string" minOccurs="0"/>
         <xs:element name="participantIds" type="ParticipantIdsType" minOccurs="0"/>
@@ -149,6 +150,7 @@
     <xs:complexType>
       <xs:sequence>
         <xs:element name="sessionId" type="UUIDType"/>
+        <xs:element name="sessionName" type="xs:string"/>
         <xs:element name="oldDate" type="xs:date"/>
         <xs:element name="oldStartTime" type="xs:time"/>
         <xs:element name="oldEndTime" type="xs:time"/>
