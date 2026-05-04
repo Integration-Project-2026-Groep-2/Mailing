@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processCrmUserConfirmedUser } = require("../flows/crmUserFlows");
 
 const userContractPath = path.resolve(
@@ -170,17 +173,17 @@ function createCrmUserConfirmedConsumer({
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ crm.user.confirmed connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `CRM user consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `CRM user consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -250,39 +253,26 @@ function createCrmUserConfirmedConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error("Rejecting invalid crm.user.confirmed payload", {
-                    ...errorContext,
-                    errorMessage: error.message,
-                });
+                logger.error(`Rejecting invalid crm.user.confirmed payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) {
-                console.error(
-                    "Rejecting crm.user.confirmed payload due to duplicate key conflict",
-                    {
-                        ...errorContext,
-                        errorMessage: error.message,
-                    },
-                );
+                logger.error(`Rejecting crm.user.confirmed payload due to duplicate key conflict: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error("Failed processing crm.user.confirmed payload", {
-                ...errorContext,
-                shouldRequeue,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed processing crm.user.confirmed payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("CRM user sync consumer is disabled");
+            logger.info("CRM user sync consumer is disabled");
             return;
         }
 

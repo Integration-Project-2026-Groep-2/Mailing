@@ -1,3 +1,7 @@
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+
 async function sendToUser(
     user,
     payload,
@@ -38,11 +42,7 @@ async function processNotifyAllUsers(
                 sendgridService,
             });
         } catch (error) {
-            console.error("Failed sending notify-all-users email", {
-                userId: user.id,
-                recipientEmail: user.email,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed sending notify-all-users email to user ${user.id} (${user.email}): ${error.message}`);
         }
     }
 }

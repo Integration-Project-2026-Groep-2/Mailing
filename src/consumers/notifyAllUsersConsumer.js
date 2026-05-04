@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processNotifyAllUsers } = require("../flows/notifyAllUsersFlows");
 
 const notifyAllUsersContractPath = path.resolve(
@@ -174,18 +177,18 @@ function createNotifyAllUsersConsumer({
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ news.notify.all connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
-                    `News notify-all consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
+                logger.info(
+                    `News notify all consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
-                    `News notify-all consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
+                logger.error(
+                    `News notify all consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
                 if (attempt === maxRetries) {
@@ -249,27 +252,20 @@ function createNotifyAllUsersConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error("Rejecting invalid news.notify.all payload", {
-                    ...errorContext,
-                    errorMessage: error.message,
-                });
+                logger.error(`Rejecting invalid news.notify.all payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error("Failed processing news.notify.all payload", {
-                ...errorContext,
-                shouldRequeue,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed processing news.notify.all payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("News notify-all consumer is disabled");
+            logger.info("News notify all consumer is disabled");
             return;
         }
 

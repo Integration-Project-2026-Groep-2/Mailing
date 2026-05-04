@@ -1,7 +1,10 @@
 const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
-const { buildRabbitUrlFromEnv } = require("./heartbeatPublisher");
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
 
 const mailingUserContractPath = path.resolve(
     __dirname,
@@ -183,17 +186,17 @@ function createMailingUserPublisher() {
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ mailing user publisher connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `Mailing user publisher connected to exchange '${exchange}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `Mailing user publisher connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -239,7 +242,7 @@ function createMailingUserPublisher() {
         );
 
         if (!published) {
-            console.warn(
+            logger.warn(
                 `Mailing user publish backpressure on routing key '${routingKey}'`,
             );
         }
@@ -273,7 +276,7 @@ function createMailingUserPublisher() {
 
     async function start() {
         if (!enabled) {
-            console.log("Mailing user publisher is disabled");
+            logger.info("Mailing user publisher is disabled");
             return;
         }
 

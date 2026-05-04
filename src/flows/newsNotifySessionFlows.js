@@ -1,3 +1,7 @@
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+
 async function sendToParticipant(
     participantId,
     payload,
@@ -49,11 +53,7 @@ async function processNotifySession(
                 sendgridService,
             });
         } catch (error) {
-            console.error("Failed sending notify-session email", {
-                participantId,
-                sessionId: payload.sessionId,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed sending notify-session email to participant ${participantId} for session ${payload.sessionId}: ${error.message}`);
         }
     }
 }

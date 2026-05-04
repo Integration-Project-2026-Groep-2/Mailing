@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processInvoiceFinalized } = require("../flows/invoiceFlows");
 
 const invoiceContractPath = path.resolve(
@@ -208,17 +211,17 @@ function createInvoiceFinalizedConsumer({
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ invoice.finalized connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `Invoice finalized consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `Invoice finalized consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -290,27 +293,20 @@ function createInvoiceFinalizedConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error("Rejecting invalid invoice.finalized payload", {
-                    ...errorContext,
-                    errorMessage: error.message,
-                });
+                logger.error(`Rejecting invalid invoice.finalized payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error("Failed processing invoice.finalized payload", {
-                ...errorContext,
-                shouldRequeue,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed processing invoice.finalized payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("Invoice finalized consumer is disabled");
+            logger.info("Invoice finalized consumer is disabled");
             return;
         }
 

@@ -1,3 +1,7 @@
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+
 async function sendToParticipant(
     participantId,
     payload,
@@ -55,11 +59,7 @@ async function processParticipants(
                 },
             );
         } catch (error) {
-            console.error("Failed sending planning email", {
-                participantId,
-                sessionId: payload.sessionId,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed sending planning email to participant ${participantId} for session ${payload.sessionId}: ${error.message}`);
         }
     }
 }

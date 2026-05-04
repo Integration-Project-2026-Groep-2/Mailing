@@ -38,6 +38,9 @@ const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
 const { createMigrationService } = require("./services/migrationService");
 const { processNotifyAllUsers } = require("./flows/notifyAllUsersFlows");
+const { initializeLogging } = require("./services/loggingService");
+
+const logger = initializeLogging();
 
 require("dotenv").config({
     path: path.resolve(process.cwd(), ".env"),
@@ -235,10 +238,7 @@ function parseNotifyAllUsersPayload(body) {
 
 function logFlowError(flow, operation, error, context = {}) {
     const errorMessage = error?.message || String(error);
-    console.error(`[${flow}] ${operation} failed`, {
-        ...context,
-        errorMessage,
-    });
+    logger.error(`[${flow}] ${operation} failed: ${errorMessage} ${JSON.stringify(context)}`);
 }
 
 function handleApiError(res, error, options = {}) {
@@ -290,10 +290,10 @@ async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
 
             const connection = await pool.getConnection();
             connection.release();
-            console.log("Connected to MariaDB");
+            logger.info("Connected to MariaDB");
             return;
         } catch (error) {
-            console.error(
+            logger.error(
                 `Database connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
             );
 
@@ -408,9 +408,7 @@ app.post("/admin/notify-all-users", async (req, res) => {
 
 app.post("/users", async (req, res) => {
     if (!userRepository) {
-        console.error("[api.users] create failed", {
-            reason: "user repository not initialized",
-        });
+        logger.error("[api.users] create failed: user repository not initialized");
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -419,10 +417,7 @@ app.post("/users", async (req, res) => {
         const user = parseCreateUserPayload(req.body);
         const existing = await userRepository.findUserByEmail(user.email);
         if (existing) {
-            console.error("[api.users] create failed", {
-                reason: "email already exists",
-                email: user.email,
-            });
+            logger.error(`[api.users] create failed: email already exists (${user.email})`);
             res.status(409).json({
                 error: "User with this email already exists",
                 user: existing,
@@ -459,10 +454,7 @@ app.post("/users", async (req, res) => {
 
 app.put("/users/:id", async (req, res) => {
     if (!userRepository) {
-        console.error("[api.users] update failed", {
-            reason: "user repository not initialized",
-            id: req.params?.id,
-        });
+        logger.error(`[api.users] update failed: user repository not initialized (id: ${req.params?.id})`);
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -471,10 +463,7 @@ app.put("/users/:id", async (req, res) => {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
         if (!existingUser) {
-            console.error("[api.users] update failed", {
-                reason: "user not found",
-                id: userId,
-            });
+            logger.error(`[api.users] update failed: user not found (id: ${userId})`);
             res.status(404).json({ error: "User not found" });
             return;
         }
@@ -518,10 +507,7 @@ app.put("/users/:id", async (req, res) => {
 
 app.post("/users/:id/deactivate", async (req, res) => {
     if (!userRepository) {
-        console.error("[api.users] deactivate failed", {
-            reason: "user repository not initialized",
-            id: req.params?.id,
-        });
+        logger.error(`[api.users] deactivate failed: user repository not initialized (id: ${req.params?.id})`);
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -530,10 +516,7 @@ app.post("/users/:id/deactivate", async (req, res) => {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
         if (!existingUser) {
-            console.error("[api.users] deactivate failed", {
-                reason: "user not found",
-                id: userId,
-            });
+            logger.error(`[api.users] deactivate failed: user not found (id: ${userId})`);
             res.status(404).json({ error: "User not found" });
             return;
         }
@@ -581,10 +564,7 @@ app.post("/users/:id/deactivate", async (req, res) => {
 
 app.post("/users/:id/permanent-delete", async (req, res) => {
     if (!userRepository) {
-        console.error("[api.users] permanent-delete failed", {
-            reason: "user repository not initialized",
-            id: req.params?.id,
-        });
+        logger.error(`[api.users] permanent-delete failed: user repository not initialized (id: ${req.params?.id})`);
         res.status(503).json({ error: "User repository not initialized" });
         return;
     }
@@ -593,10 +573,7 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
         const userId = normalizeRequiredUuid(req.params.id, "id");
         const existingUser = await userRepository.findUserById(userId);
         if (!existingUser) {
-            console.error("[api.users] permanent-delete failed", {
-                reason: "user not found",
-                id: userId,
-            });
+            logger.error(`[api.users] permanent-delete failed: user not found (id: ${userId})`);
             res.status(404).json({ error: "User not found" });
             return;
         }
@@ -608,10 +585,7 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
         });
 
         if (deletedRows === 0) {
-            console.error("[api.users] permanent-delete failed", {
-                reason: "user identity no longer matches",
-                id: userId,
-            });
+            logger.error(`[api.users] permanent-delete failed: user identity no longer matches (id: ${userId})`);
             res.status(409).json({
                 error: "User delete failed: user identity no longer matches",
             });
@@ -729,6 +703,7 @@ async function start() {
             sendgridService,
         });
 
+    await logger.start();
     await heartbeatPublisher.start();
     await mailingUserPublisher.start();
     await crmUserConfirmedConsumer.start();
@@ -742,12 +717,12 @@ async function start() {
     await planningSessionRescheduledConsumer.start();
 
     server = app.listen(port, () => {
-        console.log(`Mailing service listening on port ${port}`);
+        logger.info(`Mailing service listening on port ${port}`);
     });
 }
 
 async function shutdown(signal) {
-    console.log(`Received ${signal}. Shutting down...`);
+    logger.info(`Received ${signal}. Shutting down...`);
 
     if (server) {
         await new Promise((resolve, reject) => {
@@ -760,6 +735,8 @@ async function shutdown(signal) {
             });
         });
     }
+
+    await logger.stop();
 
     await heartbeatPublisher.stop();
     await mailingUserPublisher.stop();
@@ -809,21 +786,21 @@ async function shutdown(signal) {
 
 process.on("SIGINT", () => {
     shutdown("SIGINT").catch((error) => {
-        console.error("Failed graceful shutdown:", error);
+        logger.error(`Failed graceful shutdown: ${error.message}`);
         process.exit(1);
     });
 });
 
 process.on("SIGTERM", () => {
     shutdown("SIGTERM").catch((error) => {
-        console.error("Failed graceful shutdown:", error);
+        logger.error(`Failed graceful shutdown: ${error.message}`);
         process.exit(1);
     });
 });
 
 if (require.main === module) {
     start().catch((error) => {
-        console.error("Failed to start service:", error);
+        logger.error(`Failed to start service: ${error.message}`);
         process.exit(1);
     });
 }

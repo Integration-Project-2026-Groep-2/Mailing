@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processCrmUserDeactivatedUser } = require("../flows/crmUserFlows");
 
 const userContractPath = path.resolve(
@@ -173,17 +176,17 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ crm.user.deactivated connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `CRM user deactivated consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `CRM user deactivated consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -234,7 +237,7 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
         });
 
         if (affectedRows === 0) {
-            console.warn(
+            logger.warn(
                 `No user found to deactivate for id='${payload.id}', email='${payload.email}'.`,
             );
         }
@@ -252,30 +255,20 @@ function createCrmUserDeactivatedConsumer({ userRepository }) {
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error(
-                    "Rejecting invalid crm.user.deactivated payload",
-                    {
-                        ...errorContext,
-                        errorMessage: error.message,
-                    },
-                );
+                logger.error(`Rejecting invalid crm.user.deactivated payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error("Failed processing crm.user.deactivated payload", {
-                ...errorContext,
-                shouldRequeue,
-                errorMessage: error.message,
-            });
+            logger.error(`Failed processing crm.user.deactivated payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("CRM user deactivated consumer is disabled");
+            logger.info("CRM user deactivated consumer is disabled");
             return;
         }
 

@@ -1,6 +1,10 @@
 const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
+const { getLogger } = require("../services/loggingService");
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
+
+const logger = getLogger();
 
 const heartbeatContractPath = path.resolve(
     __dirname,
@@ -28,26 +32,6 @@ function parseBoolean(value, defaultValue = true) {
     return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
 }
 
-function buildRabbitUrlFromEnv() {
-    if (process.env.RABBITMQ_URL) {
-        return process.env.RABBITMQ_URL;
-    }
-
-    const host = process.env.RABBITMQ_HOST || "rabbitmq";
-    const port = Number(
-        process.env.RABBITMQ_PORT || process.env.RABBITMQ_AMQP_PORT || 5672,
-    );
-    const user = encodeURIComponent(
-        process.env.RABBITMQ_DEFAULT_USER || "guest",
-    );
-    const password = encodeURIComponent(
-        process.env.RABBITMQ_DEFAULT_PASS || "guest",
-    );
-    const vhost = process.env.RABBITMQ_VHOST || "/";
-    const normalizedVHost = vhost === "/" ? "%2F" : encodeURIComponent(vhost);
-
-    return `amqp://${user}:${password}@${host}:${port}/${normalizedVHost}`;
-}
 
 function buildRabbitManagementBaseUrl() {
     const host =
@@ -121,7 +105,7 @@ async function ensureRabbitExchangeType(exchange, exchangeType) {
         return;
     }
 
-    console.warn(
+    logger.warn(
         `Heartbeat exchange '${exchange}' exists as '${metadata.type}', recreating as '${exchangeType}'.`,
     );
     await deleteRabbitExchange(exchange);
@@ -199,7 +183,7 @@ function createHeartbeatPublisher() {
                 channel = await connection.createChannel();
 
                 channel.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ heartbeat channel error: ${error.message}`,
                     );
                 });
@@ -214,17 +198,17 @@ function createHeartbeatPublisher() {
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ heartbeat connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `Heartbeat publisher connected to exchange '${exchange}' using routing key '${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `Heartbeat connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -269,12 +253,12 @@ function createHeartbeatPublisher() {
             );
 
             if (!published) {
-                console.warn(
+                logger.warn(
                     "Heartbeat publish backpressure: broker buffer is full",
                 );
             }
         } catch (error) {
-            console.error(`Heartbeat publish failed: ${error.message}`);
+            logger.error(`Heartbeat publish failed: ${error.message}`);
         } finally {
             isPublishing = false;
         }
@@ -282,7 +266,7 @@ function createHeartbeatPublisher() {
 
     async function start() {
         if (!enabled) {
-            console.log("Heartbeat publisher is disabled");
+            logger.info("Heartbeat publisher is disabled");
             return;
         }
 

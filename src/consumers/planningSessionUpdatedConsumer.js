@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processSessionUpdated } = require("../flows/planningSessionFlows");
 
 const planningContractPath = path.resolve(
@@ -191,17 +194,17 @@ function createPlanningSessionUpdatedConsumer({
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ planning.session.updated connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `Planning session updated consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `Planning session updated consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -270,35 +273,20 @@ function createPlanningSessionUpdatedConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error(
-                    "Rejecting invalid planning.session.updated payload",
-                    {
-                        ...errorContext,
-                        validationType: "XSD",
-                        schemaPath: planningContractPath,
-                        errorMessage: error.message,
-                    },
-                );
+                logger.error(`Rejecting invalid planning.session.updated payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error(
-                "Failed processing planning.session.updated payload",
-                {
-                    ...errorContext,
-                    shouldRequeue,
-                    errorMessage: error.message,
-                },
-            );
+            logger.error(`Failed processing planning.session.updated payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("Planning session updated consumer is disabled");
+            logger.info("Planning session updated consumer is disabled");
             return;
         }
 

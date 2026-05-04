@@ -2,7 +2,10 @@ const amqp = require("amqplib");
 const path = require("path");
 const { spawn } = require("child_process");
 const { XMLParser } = require("fast-xml-parser");
-const { buildRabbitUrlFromEnv } = require("../publishers/heartbeatPublisher");
+const { getLogger } = require("../services/loggingService");
+
+const logger = getLogger();
+const { buildRabbitUrlFromEnv } = require("../utils/rabbitUtils");
 const { processSessionCancelled } = require("../flows/planningSessionFlows");
 
 const planningContractPath = path.resolve(
@@ -191,17 +194,17 @@ function createPlanningSessionCancelledConsumer({
                 });
 
                 connection.on("error", (error) => {
-                    console.error(
+                    logger.error(
                         `RabbitMQ planning.session.cancelled connection error: ${error.message}`,
                     );
                 });
 
-                console.log(
+                logger.info(
                     `Planning session cancelled consumer connected. queue='${queue}', exchange='${exchange}', routingKey='${routingKey}'`,
                 );
                 return;
             } catch (error) {
-                console.error(
+                logger.error(
                     `Planning session cancelled consumer connection attempt ${attempt}/${maxRetries} failed: ${error.message}`,
                 );
 
@@ -269,35 +272,20 @@ function createPlanningSessionCancelledConsumer({
             channel.ack(msg);
         } catch (error) {
             if (isValidationError(error)) {
-                console.error(
-                    "Rejecting invalid planning.session.cancelled payload",
-                    {
-                        ...errorContext,
-                        validationType: "XSD",
-                        schemaPath: planningContractPath,
-                        errorMessage: error.message,
-                    },
-                );
+                logger.error(`Rejecting invalid planning.session.cancelled payload: ${error.message} ${JSON.stringify(errorContext)}`);
                 channel.nack(msg, false, false);
                 return;
             }
 
             const shouldRequeue = isTransientError(error);
-            console.error(
-                "Failed processing planning.session.cancelled payload",
-                {
-                    ...errorContext,
-                    shouldRequeue,
-                    errorMessage: error.message,
-                },
-            );
+            logger.error(`Failed processing planning.session.cancelled payload (shouldRequeue=${shouldRequeue}): ${error.message} ${JSON.stringify(errorContext)}`);
             channel.nack(msg, false, shouldRequeue);
         }
     }
 
     async function start() {
         if (!enabled) {
-            console.log("Planning session cancelled consumer is disabled");
+            logger.info("Planning session cancelled consumer is disabled");
             return;
         }
 
