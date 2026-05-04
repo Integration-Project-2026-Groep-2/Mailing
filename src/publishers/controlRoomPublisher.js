@@ -93,7 +93,11 @@ function validateWithXmllint(xml, schemaPath) {
 }
 
 function createControlRoomPublisher() {
-    const enabled = parseBoolean(process.env.CONTROL_ROOM_ENABLED, true);
+    const isTest = process.env.NODE_ENV === "test";
+    const enabled = parseBoolean(
+        process.env.CONTROL_ROOM_ENABLED,
+        isTest ? false : true,
+    );
     const serviceId = process.env.CONTROL_ROOM_SERVICE_ID || "mailing";
     const statusIntervalMs = 2 * 60 * 1000; // 2 minutes
 
@@ -109,12 +113,18 @@ function createControlRoomPublisher() {
     let channel;
     let statusTimer;
     let isConnecting = false;
+    let isStopped = false;
 
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
         if (isConnecting) return;
         isConnecting = true;
 
         for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+            if (isStopped) {
+                isConnecting = false;
+                return;
+            }
+
             try {
                 connection = await amqp.connect(rabbitUrl);
                 channel = await connection.createChannel();
@@ -155,6 +165,11 @@ function createControlRoomPublisher() {
                     isConnecting = false;
                     throw error;
                 }
+                if (isStopped) {
+                    isConnecting = false;
+                    return;
+                }
+
                 await new Promise((resolve) =>
                     setTimeout(resolve, retryDelayMs),
                 );
@@ -249,6 +264,7 @@ function createControlRoomPublisher() {
     }
 
     async function stop() {
+        isStopped = true;
         if (statusTimer) {
             clearInterval(statusTimer);
             statusTimer = undefined;

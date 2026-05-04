@@ -149,9 +149,11 @@ function createNotifyAllUsersConsumer({
 
     let connection;
     let channel;
+    let isStopped = false;
 
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
         for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+            if (isStopped) return;
             try {
                 connection = await amqp.connect(rabbitUrl);
                 channel = await connection.createChannel();
@@ -195,6 +197,7 @@ function createNotifyAllUsersConsumer({
                     throw error;
                 }
 
+                if (isStopped) return;
                 await new Promise((resolve) => {
                     setTimeout(resolve, retryDelayMs);
                 });
@@ -276,6 +279,7 @@ function createNotifyAllUsersConsumer({
     }
 
     async function stop() {
+        isStopped = true;
         if (channel) {
             await channel.close();
             channel = undefined;

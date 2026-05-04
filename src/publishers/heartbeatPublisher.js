@@ -169,6 +169,7 @@ function createHeartbeatPublisher() {
     let channel;
     let timer;
     let isPublishing = false;
+    let isStopped = false;
 
     async function validateHeartbeatXml(xml) {
         await validateHeartbeatWithXmllint(xml);
@@ -176,6 +177,7 @@ function createHeartbeatPublisher() {
 
     async function connectWithRetry(maxRetries = 20, retryDelayMs = 3000) {
         for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+            if (isStopped) return;
             try {
                 await ensureRabbitExchangeType(exchange, exchangeType);
 
@@ -216,6 +218,7 @@ function createHeartbeatPublisher() {
                     throw error;
                 }
 
+                if (isStopped) return;
                 await new Promise((resolve) => {
                     setTimeout(resolve, retryDelayMs);
                 });
@@ -280,6 +283,7 @@ function createHeartbeatPublisher() {
     }
 
     async function stop() {
+        isStopped = true;
         if (timer) {
             clearInterval(timer);
             timer = undefined;
