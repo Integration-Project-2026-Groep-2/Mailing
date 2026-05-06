@@ -33,6 +33,9 @@ const {
 const {
     createPlanningSessionRescheduledConsumer,
 } = require("./consumers/planningSessionRescheduledConsumer");
+const {
+    createNewsWarningConsumer,
+} = require("./consumers/newsWarningConsumer");
 const { createUserRepository } = require("./repositories/userRepository");
 const { createMailLogRepository } = require("./repositories/mailLogRepository");
 const { createSendgridService } = require("./services/sendgridService");
@@ -72,6 +75,7 @@ let newsNotifySessionConsumer;
 let planningSessionUpdatedConsumer;
 let planningSessionCancelledConsumer;
 let planningSessionRescheduledConsumer;
+let newsWarningConsumer;
 let userRepository;
 let mailLogRepository;
 let sendgridService;
@@ -702,6 +706,7 @@ async function start() {
             mailLogRepository,
             sendgridService,
         });
+    newsWarningConsumer = createNewsWarningConsumer({ sendgridService });
 
     await logger.start();
     await heartbeatPublisher.start();
@@ -715,6 +720,7 @@ async function start() {
     await planningSessionUpdatedConsumer.start();
     await planningSessionCancelledConsumer.start();
     await planningSessionRescheduledConsumer.start();
+    await newsWarningConsumer.start();
 
     server = app.listen(port, () => {
         logger.info(`Mailing service listening on port ${port}`);
@@ -775,6 +781,10 @@ async function shutdown(signal) {
 
     if (planningSessionRescheduledConsumer) {
         await planningSessionRescheduledConsumer.stop();
+    }
+
+    if (newsWarningConsumer) {
+        await newsWarningConsumer.stop();
     }
 
     if (pool) {

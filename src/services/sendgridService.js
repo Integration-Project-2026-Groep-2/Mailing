@@ -40,6 +40,10 @@ function createSendgridService() {
         process.env.SENDGRID_SESSION_RESCHEDULED_TEMPLATE_ID ||
         "d-33ced75f5e0342d4b8a2b3f573eec23a"
     ).trim();
+    const newsWarningTemplateId = (
+        process.env.SENDGRID_NEWS_WARNING_TEMPLATE_ID ||
+        "d-3f1beae78e2547069a517c9df0f1545a"
+    ).trim();
 
     if (!enabled) {
         return {
@@ -51,6 +55,7 @@ function createSendgridService() {
             sessionUpdatedTemplateId,
             sessionCanceledTemplateId,
             sessionRescheduledTemplateId,
+            newsWarningTemplateId,
             async sendUserConfirmedEmail() {
                 return;
             },
@@ -70,6 +75,9 @@ function createSendgridService() {
                 return;
             },
             async sendSessionRescheduledEmail() {
+                return;
+            },
+            async sendNewsWarningEmail() {
                 return;
             },
         };
@@ -126,6 +134,12 @@ function createSendgridService() {
     if (!sessionRescheduledTemplateId) {
         throw new Error(
             "SENDGRID_SESSION_RESCHEDULED_TEMPLATE_ID is required for planning.session.rescheduled emails",
+        );
+    }
+
+    if (!newsWarningTemplateId) {
+        throw new Error(
+            "SENDGRID_NEWS_WARNING_TEMPLATE_ID is required for news.warning emails",
         );
     }
 
@@ -316,6 +330,19 @@ function createSendgridService() {
         );
     }
 
+    async function sendNewsWarningEmail(payload) {
+        await sendWithDiagnostics("sendNewsWarningEmail", {
+            to: payload.recipientEmail,
+            from: fromEmail,
+            templateId: newsWarningTemplateId,
+            dynamicTemplateData: {
+                subject_line: payload.subjectLine || "WAARSCHUWING: Incidenten gedetecteerd!",
+                service: payload.service || "",
+                warnings: payload.warnings || [],
+            },
+        });
+    }
+
     return {
         enabled,
         confirmationTemplateId,
@@ -332,6 +359,7 @@ function createSendgridService() {
         sendSessionUpdatedEmail,
         sendSessionCanceledEmail,
         sendSessionRescheduledEmail,
+        sendNewsWarningEmail,
     };
 }
 
