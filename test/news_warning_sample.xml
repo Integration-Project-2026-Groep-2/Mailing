@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Warning>
+  <service>news-collector-service</service>
+  <warnings>
+    <timestamp>2026-05-06T14:50:00Z</timestamp>
+    <issue>Connection to RSS feed "Global News" timed out.</issue>
+  </warnings>
+  <warnings>
+    <timestamp>2026-05-06T14:55:00Z</timestamp>
+    <issue>High memory usage detected in worker process 42.</issue>
+  </warnings>
+</Warning>
