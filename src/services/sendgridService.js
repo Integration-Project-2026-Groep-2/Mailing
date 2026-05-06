@@ -131,8 +131,37 @@ function createSendgridService() {
 
     sgMail.setApiKey(apiKey);
 
+    function formatSendgridError(operation, error) {
+        const statusCode =
+            error?.code ||
+            error?.statusCode ||
+            error?.response?.statusCode ||
+            error?.response?.body?.errors?.[0]?.status;
+        const responseBody = error?.response?.body;
+        const details =
+            responseBody && typeof responseBody === "object"
+                ? JSON.stringify(responseBody)
+                : String(error?.message || "Unknown SendGrid error");
+
+        const diagnosticError = new Error(
+            `${operation} failed (status=${statusCode || "unknown"}): ${details}`,
+        );
+        diagnosticError.cause = error;
+        diagnosticError.statusCode = statusCode;
+        diagnosticError.responseBody = responseBody;
+        return diagnosticError;
+    }
+
+    async function sendWithDiagnostics(operation, message) {
+        try {
+            await sgMail.send(message);
+        } catch (error) {
+            throw formatSendgridError(operation, error);
+        }
+    }
+
     async function sendUserConfirmedEmail(user) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendUserConfirmedEmail", {
             to: user.email,
             from: fromEmail,
             templateId: confirmationTemplateId,
@@ -155,7 +184,7 @@ function createSendgridService() {
         const totalAmount = String(invoice.totalAmount ?? "");
         const invoiceType = invoice.type || "";
 
-        await sgMail.send({
+        await sendWithDiagnostics("sendInvoiceFinalizedEmail", {
             to: recipientEmail,
             from: fromEmail,
             templateId: invoiceFinalizedTemplateId,
@@ -170,7 +199,7 @@ function createSendgridService() {
     }
 
     async function sendNotifyAllUsersEmail(update) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendNotifyAllUsersEmail", {
             to: update.recipientEmail,
             from: fromEmail,
             templateId: notifyAllUsersTemplateId,
@@ -183,7 +212,7 @@ function createSendgridService() {
     }
 
     async function sendNotifySessionEmail(payload) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendNotifySessionEmail", {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: notifySessionTemplateId,
@@ -197,7 +226,7 @@ function createSendgridService() {
     }
 
     async function sendSessionUpdatedEmail(payload) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendSessionUpdatedEmail", {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionUpdatedTemplateId,
@@ -213,7 +242,7 @@ function createSendgridService() {
     }
 
     async function sendSessionCanceledEmail(payload) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendSessionCanceledEmail", {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionCanceledTemplateId,
@@ -228,7 +257,7 @@ function createSendgridService() {
     }
 
     async function sendSessionRescheduledEmail(payload) {
-        await sgMail.send({
+        await sendWithDiagnostics("sendSessionRescheduledEmail", {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionRescheduledTemplateId,
