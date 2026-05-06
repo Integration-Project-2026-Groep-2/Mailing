@@ -21,6 +21,7 @@ async function sendToParticipant(
             sessionName: payload.sessionName,
             subjectLine: payload.subjectLine,
             message: payload.message,
+            icsData: payload.icsData,
         });
         await mailLogRepository.insertMailLog({
             userId: user.id,

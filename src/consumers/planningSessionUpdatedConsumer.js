@@ -246,6 +246,7 @@ function createPlanningSessionUpdatedConsumer({
             newTime: payload.newTime,
             newLocation: payload.newLocation,
             participantIds: extractParticipantIds(payload),
+            icsData: payload.icsData,
             timestamp: payload.timestamp,
         };
     }

@@ -20,6 +20,7 @@
         <xs:element name="participantIds" type="ParticipantIdsType"/>
         <xs:element name="subjectLine" type="xs:string"/>
         <xs:element name="message" type="xs:string"/>
+        <xs:element name="icsData" type="xs:string" minOccurs="0"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>

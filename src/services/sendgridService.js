@@ -160,6 +160,25 @@ function createSendgridService() {
         }
     }
 
+    function addIcsAttachment(message, icsData) {
+        if (!icsData) {
+            return message;
+        }
+
+        return {
+            ...message,
+            attachments: [
+                ...(message.attachments || []),
+                {
+                    content: icsData,
+                    filename: "invite.ics",
+                    type: "text/calendar",
+                    disposition: "attachment",
+                },
+            ],
+        };
+    }
+
     async function sendUserConfirmedEmail(user) {
         await sendWithDiagnostics("sendUserConfirmedEmail", {
             to: user.email,
@@ -212,7 +231,7 @@ function createSendgridService() {
     }
 
     async function sendNotifySessionEmail(payload) {
-        await sendWithDiagnostics("sendNotifySessionEmail", {
+        const message = {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: notifySessionTemplateId,
@@ -222,11 +241,16 @@ function createSendgridService() {
                 subjectLine: payload.subjectLine || "",
                 message: payload.message || "",
             },
-        });
+        };
+
+        await sendWithDiagnostics(
+            "sendNotifySessionEmail",
+            addIcsAttachment(message, payload.icsData),
+        );
     }
 
     async function sendSessionUpdatedEmail(payload) {
-        await sendWithDiagnostics("sendSessionUpdatedEmail", {
+        const message = {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionUpdatedTemplateId,
@@ -238,11 +262,16 @@ function createSendgridService() {
                 newLocation: payload.newLocation || "",
                 timestamp: payload.timestamp || "",
             },
-        });
+        };
+
+        await sendWithDiagnostics(
+            "sendSessionUpdatedEmail",
+            addIcsAttachment(message, payload.icsData),
+        );
     }
 
     async function sendSessionCanceledEmail(payload) {
-        await sendWithDiagnostics("sendSessionCanceledEmail", {
+        const message = {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionCanceledTemplateId,
@@ -253,11 +282,16 @@ function createSendgridService() {
                 reason: payload.reason || "",
                 timestamp: payload.timestamp || "",
             },
-        });
+        };
+
+        await sendWithDiagnostics(
+            "sendSessionCanceledEmail",
+            addIcsAttachment(message, payload.icsData),
+        );
     }
 
     async function sendSessionRescheduledEmail(payload) {
-        await sendWithDiagnostics("sendSessionRescheduledEmail", {
+        const message = {
             to: payload.recipientEmail,
             from: fromEmail,
             templateId: sessionRescheduledTemplateId,
@@ -274,7 +308,12 @@ function createSendgridService() {
                 reason: payload.reason || "",
                 timestamp: payload.timestamp || "",
             },
-        });
+        };
+
+        await sendWithDiagnostics(
+            "sendSessionRescheduledEmail",
+            addIcsAttachment(message, payload.icsData),
+        );
     }
 
     return {

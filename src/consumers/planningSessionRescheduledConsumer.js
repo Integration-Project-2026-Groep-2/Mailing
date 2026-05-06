@@ -251,6 +251,7 @@ function createPlanningSessionRescheduledConsumer({
             newLocation: payload.newLocation,
             reason: payload.reason,
             participantIds: extractParticipantIds(payload),
+            icsData: payload.icsData,
             timestamp: payload.timestamp,
         };
     }

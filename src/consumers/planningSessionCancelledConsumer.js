@@ -245,6 +245,7 @@ function createPlanningSessionCancelledConsumer({
             status: payload.status,
             reason: payload.reason,
             participantIds: extractParticipantIds(payload),
+            icsData: payload.icsData,
             timestamp: payload.timestamp,
         };
     }

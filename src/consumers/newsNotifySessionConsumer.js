@@ -240,6 +240,7 @@ function createNewsNotifySessionConsumer({
             participantIds: extractParticipantIds(payload),
             subjectLine: payload.subjectLine,
             message: payload.message,
+            icsData: payload.icsData,
         };
     }
 
