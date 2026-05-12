@@ -9,7 +9,8 @@
         "migrate:isactive": "node src/scripts/migrateGdprConsentToIsActive.js",
         "test": "jest",
         "test:ci": "jest --runInBand",
-        "test:integration": "jest --runInBand --config jest.integration.config.cjs"
+        "test:integration": "jest --runInBand --config jest.integration.config.cjs",
+        "test:mcp": "node --experimental-vm-modules node_modules/jest-cli/bin/jest.js --config jest.mcp.config.cjs"
     },
     "dependencies": {
         "@sendgrid/mail": "^8.1.6",
