@@ -1,0 +1,14 @@
+{
+    "name": "shiftfestival-mailing-mcp",
+    "version": "1.0.0",
+    "description": "MCP server for the Shiftfestival Mailing Service",
+    "type": "module",
+    "main": "server.mjs",
+    "scripts": {
+        "start": "node server.mjs"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.12.0",
+        "zod": "^3.23.0"
+    }
+}

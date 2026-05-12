@@ -343,6 +343,23 @@ app.get("/users", async (_req, res) => {
     }
 });
 
+app.get("/users/:id", async (req, res) => {
+    if (!UUID_V4_REGEX.test(req.params.id)) {
+        return res.status(400).json({ error: "Invalid user ID format" });
+    }
+    if (!userRepository) {
+        return res.status(503).json({ error: "User repository not initialized" });
+    }
+    try {
+        const user = await userRepository.findUserById(req.params.id);
+        if (!user) return res.status(404).json({ error: "User not found" });
+        res.status(200).json({ user });
+    } catch (error) {
+        logFlowError("api.users", "get", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get("/admin/migrations", async (_req, res) => {
     if (!migrationService) {
         res.status(503).json({ error: "Migration service not initialized" });
@@ -354,6 +371,23 @@ app.get("/admin/migrations", async (_req, res) => {
         res.status(200).json({ migrations });
     } catch (error) {
         logFlowError("api.migrations", "list", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get("/mail-logs", async (req, res) => {
+    if (!mailLogRepository) {
+        return res.status(503).json({ error: "Mail log repository not initialized" });
+    }
+    const { userId, limit } = req.query;
+    if (userId && !UUID_V4_REGEX.test(userId)) {
+        return res.status(400).json({ error: "Invalid userId format" });
+    }
+    try {
+        const logs = await mailLogRepository.findLogs({ userId: userId || null, limit });
+        res.status(200).json({ logs });
+    } catch (error) {
+        logFlowError("api.mail-logs", "list", error);
         res.status(500).json({ error: error.message });
     }
 });
