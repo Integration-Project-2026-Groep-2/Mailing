@@ -343,6 +343,10 @@ app.get("/users", async (_req, res) => {
     }
 });
 
+app.get("/users/new", (_req, res) => {
+    res.sendFile(path.join(publicDir, "new.html"));
+});
+
 app.get("/users/:id", async (req, res) => {
     if (!UUID_V4_REGEX.test(req.params.id)) {
         return res.status(400).json({ error: "Invalid user ID format" });
@@ -678,10 +682,6 @@ app.post("/users/:id/permanent-delete", async (req, res) => {
 
 app.get("/", (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
-});
-
-app.get("/users/new", (_req, res) => {
-    res.sendFile(path.join(publicDir, "new.html"));
 });
 
 app.get("/users/:id/edit", (_req, res) => {
